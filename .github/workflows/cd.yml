@@ -1,0 +1,106 @@
+name: cd
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Each run gets its own group; release serialises deploys per host instead, so
+# a long aarch64 build never holds up another host's deploy.
+concurrency:
+  group: cd-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  flake-check:
+    name: Flake check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - run: nix fmt -- --ci
+      - run: nix flake check --print-build-logs
+
+  changed:
+    name: Find changed hosts
+    runs-on: ubuntu-latest
+    outputs:
+      hosts: ${{ steps.changed.outputs.hosts }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - id: changed
+        env:
+          BASE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || [ "$BASE" = 0000000000000000000000000000000000000000 ]; then
+            # shellcheck disable=SC2016 # ${h} is Nix interpolation
+            hosts=$(nix eval --json .#nixosConfigurations --apply \
+              'cs: map (h: { host = h; system = cs.${h}.pkgs.stdenv.hostPlatform.system; }) (builtins.attrNames cs)')
+          else
+            hosts=$(nix run .#changed-hosts -- "$BASE")
+          fi
+          echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
+          echo "changed hosts: $hosts"
+
+  # Every change reached main through a reviewed PR, so there is no approval gate.
+  release:
+    name: Release ${{ matrix.host }}
+    needs: [changed, flake-check]
+    if: needs.changed.outputs.hosts != '[]'
+    runs-on: ${{ matrix.system == 'aarch64-linux' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    environment: production
+    # One deploy per host at a time; a newer pending run replaces an older one.
+    concurrency:
+      group: release-${{ matrix.host }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # OIDC token for Tailscale workload identity
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.changed.outputs.hosts) }}
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      - name: Build closure
+        env:
+          HOST: ${{ matrix.host }}
+        run: nix build ".#nixosConfigurations.$HOST.config.system.build.toplevel" --out-link result --print-build-logs
+      - uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ vars.TS_DEPLOY_CLIENT_ID }}
+          audience: ${{ vars.TS_DEPLOY_AUDIENCE }}
+          tags: tag:hatch
+      # The push token is minted per run on albipes and expires with the job,
+      # so GitHub stores no cache credential. A failed push only means the host
+      # copies the missing paths from this runner.
+      - name: Push to lab cache
+        id: push
+        continue-on-error: true
+        run: |
+          token=$(ssh -o StrictHostKeyChecking=accept-new deploy@albipes \
+            sudo atticd-atticadm make-token --sub ci --validity 2h --push nixlab --pull nixlab)
+          echo "::add-mask::$token"
+          nix run --inputs-from . nixpkgs#attic-client -- login lab http://albipes:7313 "$token"
+          nix run --inputs-from . nixpkgs#attic-client -- push lab:nixlab ./result
+      # A cache that silently stops filling would only show up as slow deploys.
+      - name: Flag a failed push
+        if: steps.push.outcome == 'failure'
+        run: echo "::warning::Push to the lab cache failed; this deploy copies paths from the runner."
+      - name: Deploy and confirm
+        env:
+          HOST: ${{ matrix.host }}
+        run: nix run .#deploy -- "$HOST"

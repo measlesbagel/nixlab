@@ -1,0 +1,4 @@
+{ ... }:
+{
+  homelab.lan.uplinkDrivers = [ "atlantic" ];
+}

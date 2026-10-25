@@ -1,0 +1,3 @@
+# The repo writes `{ ... }:` module headers and dotted option paths on
+# purpose; these two lints only flag that style.
+disabled = ["empty_pattern", "repeated_keys"]
