@@ -10,6 +10,11 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    # hjem follows hjem-rum/hjem, so it is hjem-rum's input, not ours. Dependabot
+    # would bump that node directly and drop its nixpkgs follow; hjem moves
+    # when hjem-rum is bumped instead.
+    ignore:
+      - dependency-name: hjem
 
   - package-ecosystem: github-actions
     directory: /
