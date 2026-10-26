@@ -14,6 +14,7 @@
 		"tag:homoeomma": ["autogroup:admin", "tag:molt"], // workstations
 		"tag:cyriocosmus": ["autogroup:admin", "tag:molt"], // DGX Sparks
 		"tag:hatch":  ["autogroup:admin"], // CI runners
+		"tag:larva":  ["autogroup:admin"], // PR build runners, read the lab cache only
 		// Temporary kexec installers made by `nix run .#provision`.
 		"tag:instar": ["autogroup:admin", "tag:molt"],
 	},
@@ -28,6 +29,10 @@
 
 		// CI pushes built closures to the lab binary cache (services/attic.nix).
 		{"src": ["tag:hatch"], "dst": ["tag:hapalotremus"], "ip": ["tcp:7313"]},
+
+		// PR builds pull from it. Reads are public and a push needs an Attic
+		// token, which only tag:hatch mints over SSH.
+		{"src": ["tag:larva"], "dst": ["tag:hapalotremus"], "ip": ["tcp:7313"]},
 
 		// Whoever provisions (an admin, chilense, CI) reaches the installer.
 		{"src": ["tag:hatch", "tag:homoeomma", "autogroup:admin"], "dst": ["tag:instar"], "ip": ["tcp:22"]},
@@ -75,6 +80,11 @@
 			"deny":   ["tag:typhochlaena:5432", "tag:hapalotremus:2049", "tag:hapalotremus:9000", "tag:typhochlaena:7313"],
 		},
 		{
+			"src":    "tag:larva",
+			"accept": ["tag:hapalotremus:7313"],
+			"deny":   ["tag:typhochlaena:22", "tag:hapalotremus:22", "tag:homoeomma:22", "tag:cyriocosmus:22", "tag:instar:22", "tag:typhochlaena:7313", "tag:hapalotremus:9000", "tag:hapalotremus:2049"],
+		},
+		{
 			"src":    "tag:hapalotremus",
 			"accept": ["tag:typhochlaena:22", "tag:homoeomma:22"],
 			"deny":   ["tag:typhochlaena:5432", "tag:homoeomma:5432"],
@@ -116,6 +126,11 @@
 			"src":    "tag:typhochlaena",
 			"dst":    ["tag:hapalotremus"],
 			"deny":   ["deploy", "root", "syncoid"],
+		},
+		{
+			"src":    "tag:larva",
+			"dst":    ["tag:typhochlaena", "tag:hapalotremus", "tag:homoeomma", "tag:cyriocosmus", "tag:instar"],
+			"deny":   ["deploy", "root", "syncoid", "measles"],
 		},
 	],
 }

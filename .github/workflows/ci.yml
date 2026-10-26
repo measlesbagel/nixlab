@@ -56,7 +56,7 @@ jobs:
     name: Find changed hosts
     runs-on: ubuntu-latest
     outputs:
-      hosts: ${{ steps.changed.outputs.hosts }}
+      builds: ${{ steps.changed.outputs.builds }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -68,19 +68,31 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
           hosts=$(nix run .#changed-hosts -- "$BASE")
-          echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
           echo "changed hosts: $hosts"
+          # The Sparks share their whole NVIDIA kernel and differ only in
+          # host config, so one runner builds both and compiles it once.
+          builds=$(jq -c '
+            map(select(.system != "aarch64-linux") | {name: .host, system, hosts: .host})
+            + (map(select(.system == "aarch64-linux"))
+               | if length > 0 then [{name: (map(.host) | join(", ")), system: "aarch64-linux", hosts: (map(.host) | join(" "))}] else [] end)
+          ' <<< "$hosts")
+          echo "builds=$builds" >> "$GITHUB_OUTPUT"
 
-  # No secrets and no tailnet access.
+  # Reads the lab cache over the tailnet as tag:larva, which reaches only
+  # Attic on albipes and holds no Attic token, so a PR cannot push to it.
+  # Fork PRs get no credential and build from public caches alone.
   build:
-    name: Build ${{ matrix.host }}
+    name: Build ${{ matrix.name }}
     needs: changed
-    if: needs.changed.outputs.hosts != '[]'
+    if: needs.changed.outputs.builds != '[]'
     runs-on: ${{ matrix.system == 'aarch64-linux' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+      id-token: write # OIDC token for Tailscale workload identity
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.changed.outputs.hosts) }}
+        include: ${{ fromJSON(needs.changed.outputs.builds) }}
     steps:
       - name: Free disk space
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
@@ -88,7 +100,62 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      # The cache is only trusted once its signing key is committed
+      # (modules/cache.nix); until then every step below is skipped.
+      - name: Read lab cache settings
+        id: cache
+        continue-on-error: true
+        run: |
+          cache=$(nix eval --json .#nixosConfigurations.albipes.config.homelab --apply \
+            'h: { inherit (h.cache) name port publicKey; host = h.nodes.albipes.tailscaleName; }')
+          key=$(jq -r '.publicKey // empty' <<< "$cache")
+          if [ -n "$key" ]; then
+            echo "key=$key" >> "$GITHUB_OUTPUT"
+            echo "url=$(jq -r '"http://\(.host):\(.port)/\(.name)"' <<< "$cache")" >> "$GITHUB_OUTPUT"
+          fi
+      # Dependabot runs get no OIDC token, only Dependabot secrets.
+      - name: Join tailnet
+        if: steps.cache.outputs.key != '' && github.event.pull_request.user.login != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ vars.TS_CACHE_CLIENT_ID }}
+          audience: ${{ vars.TS_CACHE_AUDIENCE }}
+          tags: tag:larva
+      - name: Join tailnet (Dependabot)
+        if: steps.cache.outputs.key != '' && github.event.pull_request.user.login == 'dependabot[bot]'
+        continue-on-error: true
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          authkey: ${{ secrets.TS_CACHE_AUTHKEY }}
+      # A cache that is down or unreachable only means building more here.
+      # nix-installer-action trusts the runner user, so the daemon takes
+      # these substituter settings from the client.
+      - name: Use lab cache
+        id: substitute
+        if: steps.cache.outputs.key != ''
+        continue-on-error: true
+        env:
+          URL: ${{ steps.cache.outputs.url }}
+          KEY: ${{ steps.cache.outputs.key }}
+        run: |
+          curl -sSf --max-time 5 "$URL/nix-cache-info" > /dev/null
+          {
+            echo 'conf<<EOF'
+            echo "extra-substituters = $URL"
+            echo "extra-trusted-public-keys = $KEY"
+            echo 'connect-timeout = 5'
+            echo 'fallback = true'
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
       - name: Build closure
         env:
-          HOST: ${{ matrix.host }}
-        run: nix build ".#nixosConfigurations.$HOST.config.system.build.toplevel" --no-link --print-build-logs
+          HOSTS: ${{ matrix.hosts }}
+          NIX_CONFIG: ${{ steps.substitute.outputs.conf }}
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          targets=()
+          for host in "${hosts[@]}"; do
+            targets+=(".#nixosConfigurations.$host.config.system.build.toplevel")
+          done
+          nix build "${targets[@]}" --no-link --print-build-logs
