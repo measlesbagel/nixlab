@@ -1,27 +1,36 @@
-# Certificates via Cloudflare DNS-01, so a vhost needs no public port.
-{ pkgs, ... }:
+# One wildcard certificate via Cloudflare DNS-01, ordered by NixOS's ACME
+# client (lego), so a vhost needs no public port and Caddy no DNS plugin.
+{ config, lib, ... }:
+let
+  inherit (config.homelab) domain;
+in
 {
-  services.caddy = {
-    enable = true;
-    package = pkgs.caddy.withPlugins {
-      plugins = [ "github.com/caddy-dns/cloudflare@v0.2.4" ];
-      hash = "sha256-dQvk6ezY6TQ1J7PjhCXnThF/SqVgPwBO8/RXzHCY+js=";
+  # Every vhost serves the wildcard unless it names another certificate.
+  options.services.caddy.virtualHosts = lib.mkOption {
+    type = lib.types.attrsOf (lib.types.submodule { config.useACMEHost = lib.mkDefault domain; });
+  };
+
+  config = {
+    services.caddy.enable = true;
+
+    security.acme = {
+      acceptTerms = true;
+      certs.${domain} = {
+        domain = "*.${domain}";
+        dnsProvider = "cloudflare";
+        credentialFiles.CLOUDFLARE_DNS_API_TOKEN_FILE = "/var/lib/opnix/secrets/cloudflareDnsToken";
+      };
     };
-    environmentFile = "/var/lib/opnix/secrets/caddyCloudflareEnv";
-    globalConfig = ''
-      acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-    '';
-  };
 
-  # 1Password item: a field holding `CLOUDFLARE_API_TOKEN=<token>`, where the
-  # token has Zone:Zone:Read and Zone:DNS:Edit on this one zone.
-  services.onepassword-secrets.secrets.caddyCloudflareEnv = {
-    reference = "op://homelab/caddy-cloudflare-env/env";
-    services = [ "caddy" ];
-  };
+    # Shared with ddns.nix: Zone:Zone:Read and Zone:DNS:Edit on this one zone.
+    services.onepassword-secrets.secrets.cloudflareDnsToken = {
+      reference = "op://homelab/cloudflare-dns-token/token";
+      services = [ "acme-order-renew-${domain}" ];
+    };
 
-  networking.firewall.allowedTCPPorts = [
-    80
-    443
-  ];
+    networking.firewall.allowedTCPPorts = [
+      80
+      443
+    ];
+  };
 }
