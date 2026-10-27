@@ -72,6 +72,7 @@
               ./services/pocket-id.nix
               ./services/wireguard.nix
               ./services/dns.nix
+              ./services/attic-public.nix
               ./services/postgresql.nix
               ./services/navidrome.nix
               ./services/model-sync.nix
