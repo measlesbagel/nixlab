@@ -1,9 +1,8 @@
 # CI/CD one-time setup
 
-Configured outside the repo, once. Tailscale access uses OIDC workload
-identity and the cache push token is minted per run on albipes, so the only
-secret in GitHub is the Dependabot cache-read key below, which reaches nothing
-but public cache reads.
+Configured outside the repo, once. No secret goes in GitHub: Tailscale access
+uses OIDC workload identity, and the cache push token is minted per run on
+albipes.
 
 ## GitHub
 
@@ -29,11 +28,7 @@ but public cache reads.
 7. Repository variables (public identifiers, not secrets): `TS_TAILNET`,
    `TS_POLICY_READ_CLIENT_ID`, `TS_POLICY_READ_AUDIENCE`,
    `TS_POLICY_WRITE_CLIENT_ID`, `TS_POLICY_WRITE_AUDIENCE`,
-   `TS_DEPLOY_CLIENT_ID`, `TS_DEPLOY_AUDIENCE`, `TS_CACHE_CLIENT_ID`,
-   `TS_CACHE_AUDIENCE`.
-8. Dependabot secret `TS_CACHE_AUTHKEY` (Settings > Secrets and variables >
-   Dependabot): see the cache-read key under Tailscale. Dependabot runs get
-   no OIDC token, so this is how their builds reach the lab cache.
+   `TS_DEPLOY_CLIENT_ID`, `TS_DEPLOY_AUDIENCE`.
 
 ## Tailscale
 
@@ -56,15 +51,8 @@ but public cache reads.
    | policy test | `repo:measlesbagel/nixlab:pull_request` | policy file, read-only |
    | policy apply | `repo:measlesbagel/nixlab:environment:production` | policy file |
    | deploy | `repo:measlesbagel/nixlab:environment:production` | `auth_keys`, tag `tag:hatch` |
-   | cache read | `repo:measlesbagel/nixlab:pull_request` | `auth_keys`, tag `tag:larva` |
 
    Use each credential's client ID and audience for the matching variables.
-5. Cache-read key for Dependabot: an auth key that is reusable, ephemeral and
-   pre-approved, tagged `tag:larva`, with the longest expiry (90 days). Store
-   it as the `TS_CACHE_AUTHKEY` Dependabot secret and rotate it before it
-   expires; an expired key only makes Dependabot builds skip the cache.
-   `tag:larva` reaches only Attic on albipes, so a leaked key exposes nothing
-   that is not already public.
 
 ### Tailnet Lock (after provisioning)
 
@@ -74,9 +62,6 @@ change:
 
 - `provision.sh` pre-signs the keys it mints with `tailscale lock sign`, so
   it must run on a signing node.
-- The `tag:larva` cache-read key must be re-minted pre-signed, and PR builds
-  from branches lose the cache (their OIDC identity cannot be pre-signed)
-  unless they switch to that key too.
 - `cd.yml` cannot use the OAuth/OIDC identity on a locked tailnet: the action
   needs a reusable, ephemeral, pre-signed auth key with `tag:hatch`, stored
   as a `production` environment secret and rotated before its 90-day expiry.
@@ -88,12 +73,6 @@ CI builds each changed host on a runner of its architecture
 (`ubuntu-24.04-arm` for aarch64), pushes the closure to Attic on albipes
 (`services/attic.nix`) and deploys. Hosts take what they can from the cache
 over the LAN and the rest from the runner.
-
-PR builds pull from the same cache over the tailnet as `tag:larva`, with no
-Attic token, so the NVIDIA kernel compiles once per kernel change rather than
-on every PR. They use it only once `homelab.cache.publicKey` is set, and fall
-back to building when it is unreachable. Fork PRs get no credential and build
-from public caches alone.
 
 The token-signing key lives at `op://homelab/attic-server-env/env`. atticd
 generates the NAR signing key when the cache is created, so once albipes
