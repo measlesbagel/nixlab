@@ -58,6 +58,7 @@
           ./modules/ups.nix
           ./modules/cache.nix
           ./modules/comin.nix
+          ./modules/nfs-server.nix
           ./modules/vm-test.nix
         ];
 
