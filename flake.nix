@@ -178,9 +178,11 @@
                 # Resolved by /etc/hosts (modules/lan.nix) or, over WireGuard,
                 # services/dns.nix.
                 targetHost = "${name}.${lan.domain}";
+                # One file per option: colmena hands these to `nix copy` in
+                # NIX_SSHOPTS, which splits on spaces.
                 sshOptions = [
                   "-o"
-                  "UserKnownHostsFile=~/.ssh/known_hosts ${knownHosts}"
+                  "GlobalKnownHostsFile=${knownHosts}"
                   "-o"
                   "StrictHostKeyChecking=accept-new"
                 ];
