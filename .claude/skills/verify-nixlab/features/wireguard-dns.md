@@ -34,19 +34,29 @@ Steps:
   `nix build --no-link --print-out-paths --inputs-from . 'nixpkgs#dnsutils^dnsutils'`,
   and use `<path>/bin/dig` in the VM, which sees the host store. Call it `$DIG`
   below.
-- **Lab names, as a peer.** Run `nixlab-vm exec -- 'ip addr add 10.100.0.9/32 dev lo; for h in seladonia albipes chilense leetzi elegans; do echo "$h $($DIG -b 10.100.0.9 +short @10.100.0.1 $h.lab.measlesbagel.dev)"; done; echo "id $($DIG -b 10.100.0.9 +short @10.100.0.1 id.measlesbagel.dev)"; ip addr del 10.100.0.9/32 dev lo'`.
+- **A peer.** From the repo root, run
+  `nixlab-vm exec -- "set -euo pipefail; set -- 10.100.0.254; $(cat scripts/wg-test-peer.sh)"`.
+  This is the script the boot test uses (`services/dns.nix`). It joins a
+  throwaway WireGuard peer at `10.100.0.254` from the network namespace
+  `peer`, over a veth, so `ip netns exec peer` asks through `wg0` and the
+  firewall like a remote device. It exits 0 with no output.
+- **Lab names, as a peer.** Run `nixlab-vm exec -- 'for h in seladonia albipes chilense leetzi elegans; do echo "$h $(ip netns exec peer $DIG +short @10.100.0.1 $h.lab.measlesbagel.dev)"; done; echo "id $(ip netns exec peer $DIG +short @10.100.0.1 id.measlesbagel.dev)"'`.
   The output is `seladonia 192.168.4.39`, `albipes 192.168.4.41`, `chilense 192.168.4.21`, `leetzi 192.168.4.51`, `elegans 192.168.4.50` and `id 192.168.4.39`.
-- **Peers only.** Run the same dig with `-b 10.0.2.15`, the VM's non-WireGuard address. `status: REFUSED`.
+  The boot test retries this for up to a minute, so retry an empty answer for as long before calling it a failure.
+- **Peers only.** Run `nixlab-vm exec -- 'ip addr add 192.168.4.39/32 dev lo; $DIG -b 192.168.4.39 @10.100.0.1 seladonia.lab.measlesbagel.dev | grep status:; ip addr del 192.168.4.39/32 dev lo'`.
+  The output shows `status: REFUSED`: seladonia's LAN address is not a peer.
 - **Not on the LAN.** Run `nixlab-vm exec -- 'ss -lunp | grep unbound'`. The only socket is
   `10.100.0.1:53`.
 
 ## Gotchas
 
-- Always pass `-b` with an address in `10.100.0.0/24` (10.100.0.9 on `lo`
-  stands in for a peer). Without it, the source can be `10.0.2.15`, which is
-  correctly REFUSED. The VM's `host` command has no `-b`, so use `dig`.
-- One early run got REFUSED for `-b 10.100.0.1`, and three repeats gave
-  NOERROR. Use 10.100.0.9 as the source, and if one lookup is REFUSED,
-  repeat it before calling it a regression.
-- No peers are configured on `main`, so a real handshake cannot be proven.
+- Never ask from the host itself with a `10.100.0.0/24` source, such as
+  `-b 10.100.0.1` or an address added to `lo`. `wireguard-nat` masquerades
+  that traffic on `lo` to the address of whichever interface registered
+  first. So the answer flips between NOERROR and REFUSED from boot to boot.
+  Ask from the `peer` namespace. Real peers are not affected.
+- `wg-test-peer.sh` is not idempotent: a second run fails at
+  `ip netns add peer`. The peer stays on `wg0` until `wg0` restarts.
+- The peer proves the handshake and the firewall path over a veth. It does not
+  prove a peer reaching seladonia from the internet through the router.
 - The public key changes on every fresh VM, so never commit one taken from a VM.
