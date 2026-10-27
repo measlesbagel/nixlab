@@ -93,7 +93,8 @@ jobs:
           ' <<< "$hosts")
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
           # nix-diff-action reads its attributes input as YAML, which accepts JSON.
-          attributes=$(jq -c 'map({displayName: .host, attribute: "nixosConfigurations.\(.host).config.system.build.toplevel"})' <<< "$hosts")
+          # It evaluates each attribute on the base too, so added hosts are left out.
+          attributes=$(jq -c 'map(select(.added | not) | {displayName: .host, attribute: "nixosConfigurations.\(.host).config.system.build.toplevel"})' <<< "$hosts")
           echo "attributes=$attributes" >> "$GITHUB_OUTPUT"
 
   # The only job with a write token, scoped to PR comments. Evaluation only:
@@ -121,6 +122,7 @@ jobs:
           COMMENTS: repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments
           ATTRIBUTES: ${{ needs.changed.outputs.attributes }}
         run: |
+          set -euo pipefail
           marker=$(jq -r 'if length == 1 then "<!-- nix-diff-action:\(.[0].displayName) -->" else "<!-- nix-diff-action -->" end' <<< "$ATTRIBUTES")
           url=$(gh api --paginate "$COMMENTS" \
             --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- nix-diff-action"))) | .url' | sed -n 1p)

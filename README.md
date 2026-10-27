@@ -49,8 +49,10 @@ GitHub. Hosts reboot into a new kernel by themselves at night, once idle
 PRs run `ci.yml` (checks and a build of each changed host) and keep one
 comment with each changed host's closure diff against the base
 ([nix-diff-action](https://github.com/natsukium/nix-diff-action), comparing
-`.drv` files, so nothing builds twice). A same-repo PR also pushes what it
-built to the Cachix cache. One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
+`.drv` files, so nothing builds twice). The sizes in it are `.drv` closures,
+not runtime closures, and the action also uploads the full diff as a workflow
+artifact. A same-repo PR also pushes what it built to the Cachix cache.
+One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
 
 ## Remote access
 
