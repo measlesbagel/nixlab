@@ -52,8 +52,7 @@ jobs:
       - run: nix fmt -- --ci
       - run: nix flake check --print-build-logs
 
-  # Fails on a nixpkgs input that is stale (over 30 days), not from the NixOS
-  # org, or not on a supported channel.
+  # The action only annotates unless fail-mode is set.
   flake-checker:
     name: Flake lock
     runs-on: ubuntu-latest
@@ -64,6 +63,7 @@ jobs:
       - uses: DeterminateSystems/flake-checker-action@786422608c7bded2bbc9741ad9f91356842bf520 # v14
         with:
           fail-mode: true
+          ignore-missing-flake-lock: false
           send-statistics: false
 
   changed:
