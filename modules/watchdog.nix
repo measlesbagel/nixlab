@@ -1,6 +1,12 @@
-# Rolls back a switch the deployer does not confirm, and a never-proven boot
-# that never becomes manageable (ssh + tailscale, not is-system-running).
-{ lib, pkgs, ... }:
+# Rolls back a switch nobody confirms (comin's hook in modules/comin.nix, or
+# `nix run .#deploy`), and a never-proven boot that never becomes manageable
+# (ssh and the remote-access path, not is-system-running).
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   stateDir = "/var/lib/deploy-watchdog";
   runDir = "/run/deploy-watchdog";
@@ -8,16 +14,10 @@ let
 
   health = pkgs.writeShellApplication {
     name = "deploy-health";
-    runtimeInputs = [
-      pkgs.systemd
-      pkgs.tailscale
-      pkgs.jq
-    ];
-    text = ''
-      systemctl is-active --quiet sshd.service
-      systemctl is-active --quiet tailscaled.service
-      tailscale status --json | jq -e '.BackendState == "Running"' > /dev/null
-    '';
+    runtimeInputs = [ pkgs.systemd ];
+    text = lib.concatLines (
+      [ "systemctl is-active --quiet sshd.service" ] ++ config.homelab.watchdog.healthChecks
+    );
   };
 
   confirm = pkgs.writeShellApplication {
@@ -30,6 +30,8 @@ let
       deploy-health
       mkdir -p ${stateDir}
       readlink -f /run/current-system > ${stateDir}/confirmed
+      # deploy-revert's target must survive garbage collection.
+      ln -sfn "$(cat ${stateDir}/confirmed)" /nix/var/nix/gcroots/deploy-confirmed
       rm -f ${runDir}/pending
 
       # Else a power cut with the internet down rolls back a confirmed
@@ -44,9 +46,34 @@ let
     '';
   };
 
+  # comin switches through its own profile (system-profiles/comin), so
+  # `nixos-rebuild --rollback` would pick a stale system generation. Setting
+  # the system profile also makes the target the default boot entry.
+  revert = pkgs.writeShellApplication {
+    name = "deploy-revert";
+    runtimeInputs = [
+      pkgs.coreutils
+      config.nix.package
+    ];
+    text = ''
+      target=$(cat ${stateDir}/confirmed 2> /dev/null || true)
+      if [ -n "$target" ] && [ -x "$target/bin/switch-to-configuration" ] \
+        && [ "$target" != "$(readlink -f /run/current-system)" ]; then
+        echo "reverting to $target"
+        nix-env --profile /nix/var/nix/profiles/system --set "$target"
+        "$target/bin/switch-to-configuration" switch
+      else
+        /run/current-system/sw/bin/nixos-rebuild --rollback switch
+      fi
+    '';
+  };
+
   rollback = pkgs.writeShellApplication {
     name = "deploy-rollback";
-    runtimeInputs = [ pkgs.coreutils ];
+    runtimeInputs = [
+      pkgs.coreutils
+      revert
+    ];
     text = ''
       deadline=$((SECONDS + ${toString confirmWindow}))
       while [ -e ${runDir}/pending ] && [ "$SECONDS" -lt "$deadline" ]; do
@@ -59,7 +86,7 @@ let
 
       echo "deploy not confirmed within ${toString confirmWindow}s — rolling back"
       rm -f ${runDir}/pending
-      /run/current-system/sw/bin/nixos-rebuild --rollback switch
+      deploy-revert
     '';
   };
 
@@ -70,6 +97,7 @@ let
       pkgs.systemd
       health
       confirm
+      revert
     ];
     text = ''
       marker="${stateDir}/rolled-back-$(cat /proc/sys/kernel/random/boot_id)"
@@ -95,67 +123,72 @@ let
 
       echo "host unmanageable after boot — rolling back"
       touch "$marker"
-      /run/current-system/sw/bin/nixos-rebuild --rollback switch
+      deploy-revert
       systemctl reboot
     '';
   };
 in
 {
-  environment.systemPackages = [
-    health
-    confirm
-  ];
-
-  boot.loader.systemd-boot.bootCounting.enable = true;
-  boot.kernelParams = [ "panic=30" ];
-
-  # Live switches only: boot activation and fresh installs must never start a
-  # countdown.
-  system.activationScripts.deployWatchdogArm = {
-    deps = [ "specialfs" ];
-    text = ''
-      if [ "''${NIXOS_ACTION:-}" = switch ] \
-        && [ -f ${stateDir}/confirmed ] \
-        && [ "$(cat ${stateDir}/confirmed)" != "$systemConfig" ]; then
-        mkdir -p ${runDir}
-        echo "$systemConfig" > ${runDir}/pending
-      fi
-    '';
+  options.homelab.watchdog.healthChecks = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    description = "Shell lines, beyond sshd, that must all succeed for the host to count as manageable.";
   };
 
-  systemd.paths.deploy-rollback = {
-    wantedBy = [ "multi-user.target" ];
-    pathConfig.PathExists = "${runDir}/pending";
-  };
-
-  systemd.services.deploy-rollback = {
-    description = "Roll back a deploy the deployer did not confirm";
-    # Never restart mid-countdown when a deploy changes this unit.
-    restartIfChanged = false;
-    stopIfChanged = false;
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = lib.getExe rollback;
-    };
-  };
-
-  systemd.services.deploy-watchdog = {
-    description = "Boot health gate with automatic rollback";
-    wantedBy = [ "multi-user.target" ];
-    after = [
-      "network-online.target"
-      "tailscaled.service"
+  config = {
+    environment.systemPackages = [
+      health
+      confirm
     ];
-    wants = [ "network-online.target" ];
-    # Restarting it on switch would block the deploy.
-    restartIfChanged = false;
-    stopIfChanged = false;
 
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      StateDirectory = "deploy-watchdog";
-      ExecStart = lib.getExe bootGate;
+    boot.loader.systemd-boot.bootCounting.enable = true;
+    boot.kernelParams = [ "panic=30" ];
+
+    # Live switches only: boot activation and fresh installs must never start a
+    # countdown.
+    system.activationScripts.deployWatchdogArm = {
+      deps = [ "specialfs" ];
+      text = ''
+        if [ "''${NIXOS_ACTION:-}" = switch ] \
+          && [ -f ${stateDir}/confirmed ] \
+          && [ "$(cat ${stateDir}/confirmed)" != "$systemConfig" ]; then
+          mkdir -p ${runDir}
+          echo "$systemConfig" > ${runDir}/pending
+        fi
+      '';
+    };
+
+    systemd.paths.deploy-rollback = {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathExists = "${runDir}/pending";
+    };
+
+    systemd.services.deploy-rollback = {
+      description = "Roll back a deploy the deployer did not confirm";
+      # Never restart mid-countdown when a deploy changes this unit.
+      restartIfChanged = false;
+      stopIfChanged = false;
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe rollback;
+      };
+    };
+
+    systemd.services.deploy-watchdog = {
+      description = "Boot health gate with automatic rollback";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      # Restarting it on switch would block the deploy.
+      restartIfChanged = false;
+      stopIfChanged = false;
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        StateDirectory = "deploy-watchdog";
+        ExecStart = lib.getExe bootGate;
+      };
     };
   };
 }

@@ -8,7 +8,7 @@ in
     environmentFile = "/var/lib/opnix/secrets/atticServerEnv";
     settings = {
       listen = "[::]:${toString config.homelab.cache.port}";
-      api-endpoint = "http://${config.homelab.nodes.albipes.tailscaleName}:${toString config.homelab.cache.port}/";
+      api-endpoint = "http://${config.homelab.nodes.albipes.ip}:${toString config.homelab.cache.port}/";
       storage = {
         type = "local";
         path = storage;
@@ -41,6 +41,6 @@ in
     services = [ "atticd" ];
   };
 
-  # Hosts pull over the LAN; CI pushes over the tailnet (trusted interface).
+  # Hosts pull and push over the LAN.
   networking.firewall.allowedTCPPorts = [ config.homelab.cache.port ];
 }

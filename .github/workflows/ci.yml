@@ -78,7 +78,7 @@ jobs:
           ' <<< "$hosts")
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
 
-  # No secrets and no tailnet access.
+  # No secrets; the lab cache only through its public read-only route.
   build:
     name: Build ${{ matrix.name }}
     needs: changed
@@ -98,14 +98,25 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      # Reads what the hosts already built through the public read-only route
+      # (services/attic-public.nix); skipped until the cache key is committed.
       # --keep-going: one grouped host failing must not hide whether the others build.
       - name: Build closure
         env:
           HOSTS: ${{ matrix.hosts }}
         run: |
           read -ra hosts <<< "$HOSTS"
+          cache=$(nix eval --json ".#nixosConfigurations.${hosts[0]}.config.homelab.cache" \
+            --apply 'c: { inherit (c) publicUrl publicKey; }')
+          key=$(jq -r '.publicKey // empty' <<< "$cache")
+          opts=()
+          if [ -n "$key" ]; then
+            opts=(--option extra-substituters "$(jq -r .publicUrl <<< "$cache")"
+              --option extra-trusted-public-keys "$key"
+              --option connect-timeout 5)
+          fi
           targets=()
           for host in "${hosts[@]}"; do
             targets+=(".#nixosConfigurations.$host.config.system.build.toplevel")
           done
-          nix build "${targets[@]}" --no-link --keep-going --print-build-logs
+          nix build "${targets[@]}" --no-link --keep-going --print-build-logs "${opts[@]}"

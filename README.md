@@ -11,6 +11,7 @@ Bare-metal NixOS homelab monorepo, the public source of truth for the fleet.
 - `home/measles/`: personal hjem config (hjem-rum modules)
 - `installer/`, `scripts/`: the kexec installer and `provision`
 - `secrets/`: secret contracts; never values
+- `tests/`: evaluation checks run by `nix flake check`
 - `.github/workflows/`: CI/CD
 
 ## Fleet
@@ -26,26 +27,36 @@ Hosts are named after dwarf tarantulas: [docs/taxonomy.md](docs/taxonomy.md).
 
 ## Deploy
 
+Merge to `main`. Every host runs [comin](https://github.com/nlewo/comin)
+(`modules/comin.nix`): it polls `main`, builds its own
+`nixosConfigurations.<host>` (pulling from the lab cache on albipes, which
+hosts fill as they build) and switches. GitHub holds no credential that
+reaches the lab; branch protection on `main` is the deploy gate.
+
 ```console
-nix run .#deploy                # apply + confirm every host over the tailnet
-nix run .#deploy -- seladonia   # one host
+comin status                    # on a host: what it runs and what it's doing
+nix run .#deploy -- seladonia   # break-glass push from chilense, then confirm
 nixos-rebuild switch --flake .#seladonia   # manual floor, on the host
 ```
 
-A switch the deployer does not confirm within 10 minutes rolls itself back,
-so a bare `colmena apply` (no `deploy-confirm`) rolls back too, and so does
-a never-proven boot that never becomes manageable (`modules/watchdog.nix`).
-Hosts reboot into a new kernel by themselves at night, once idle
+A switch nobody confirms within 10 minutes rolls itself back, and so does a
+never-proven boot that never becomes manageable (`modules/watchdog.nix`).
+comin confirms only once the host passes `deploy-health` and can still reach
+GitHub. Hosts reboot into a new kernel by themselves at night, once idle
 (`modules/reboot.nix`).
 
-PRs run `ci.yml` (checks and a build of each changed host). On merge to
-`main`, `cd.yml` builds each changed host, pushes it to the lab cache on
-albipes and deploys over the tailnet; hosts never build. One-time setup:
-[docs/ci-setup.md](docs/ci-setup.md).
+PRs run `ci.yml` (checks and a build of each changed host); it publishes
+nothing. One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
+
+## Remote access
+
+WireGuard to seladonia for getting in, and SSH logins through opkssh and
+Pocket ID, with a LAN-only break-glass key:
+[docs/remote-access.md](docs/remote-access.md).
 
 ## Provisioning
 
-`nix run .#provision -- <host>` installs over the tailnet:
+`nix run .#provision -- <host>` installs over the LAN:
 [docs/provisioning.md](docs/provisioning.md).
 
 ## Models

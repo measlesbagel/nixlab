@@ -20,6 +20,9 @@
     nix-rtl8159.url = "github:measlesbagel/nix-rtl8159";
     nix-rtl8159.inputs.nixpkgs.follows = "nixpkgs";
 
+    comin.url = "github:nlewo/comin";
+    comin.inputs.nixpkgs.follows = "nixpkgs";
+
     colmena.url = "github:zhaofengli/colmena";
     colmena.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -45,7 +48,7 @@
           ./modules/topology.nix
           ./modules/base.nix
           ./modules/lan.nix
-          ./modules/tailscale.nix
+          ./modules/ssh.nix
           ./modules/opnix.nix
           ./modules/backup.nix
           ./modules/snapshots.nix
@@ -54,6 +57,7 @@
           ./modules/reboot.nix
           ./modules/ups.nix
           ./modules/cache.nix
+          ./modules/comin.nix
         ];
 
         # `system` also picks the CI runner that builds the host.
@@ -65,6 +69,10 @@
               ./modules/zfs.nix
               ./services/caddy.nix
               ./services/ddns.nix
+              ./services/pocket-id.nix
+              ./services/wireguard.nix
+              ./services/dns.nix
+              ./services/attic-public.nix
               ./services/postgresql.nix
               ./services/navidrome.nix
               ./services/model-sync.nix
@@ -98,6 +106,7 @@
             dir = ./hosts/leetzi;
             modules = [
               ./modules/spark.nix
+              ./modules/remote-builder.nix
               ./services/model-sync.nix
             ];
           };
@@ -106,6 +115,7 @@
             dir = ./hosts/elegans;
             modules = [
               ./modules/spark.nix
+              ./modules/remote-builder.nix
               ./services/model-sync.nix
             ];
           };
@@ -128,13 +138,16 @@
           ]
           ++ spec.modules;
 
-        deployTargets = {
-          seladonia.targetHost = "seladonia";
-          albipes.targetHost = "albipes";
-          chilense.targetHost = "chilense";
-          leetzi.targetHost = "leetzi";
-          elegans.targetHost = "elegans";
-        };
+        inherit ((lib.evalModules { modules = [ ./modules/topology.nix ]; }).config.homelab) nodes lan;
+
+        # Pinned keys are checked; a host with none yet is trusted on first use.
+        knownHosts = builtins.toFile "nixlab-known-hosts" (
+          lib.concatStrings (
+            lib.mapAttrsToList (name: node: "${name},${name}.${lan.domain},${node.ip} ${node.sshHostKey}\n") (
+              lib.filterAttrs (_: node: node.sshHostKey != null) nodes
+            )
+          )
+        );
       in
       {
         systems = [
@@ -143,7 +156,7 @@
         ];
 
         flake = {
-          # One evaluation: CI builds exactly the system colmena deploys.
+          # One evaluation: CI builds exactly the system comin and colmena deploy.
           nixosConfigurations = inputs.self.colmenaHive.nodes;
 
           colmenaHive = inputs.colmena.lib.makeHive (
@@ -157,16 +170,24 @@
             // lib.mapAttrs (name: spec: {
               deployment = {
                 targetUser = "deploy";
-                tags = [ "homelab" ];
-                # Hosts never build, and never depend on the lab cache being up.
-                buildOnTarget = false;
-                # Tailscale SSH authenticates the node, so first contact is safe.
+                tags = [
+                  "homelab"
+                  nodes.${name}.genus
+                ];
+                # As comin does: the host builds, pulling what it can from Attic.
+                buildOnTarget = true;
+                # Resolved by /etc/hosts (modules/lan.nix) or, over WireGuard,
+                # services/dns.nix.
+                targetHost = "${name}.${lan.domain}";
+                # One file per option: colmena hands these to `nix copy` in
+                # NIX_SSHOPTS, which splits on spaces.
                 sshOptions = [
+                  "-o"
+                  "GlobalKnownHostsFile=${knownHosts}"
                   "-o"
                   "StrictHostKeyChecking=accept-new"
                 ];
-              }
-              // deployTargets.${name};
+              };
               imports = hostModules spec;
             }) hosts
           );
@@ -198,6 +219,13 @@
               {
                 statix = lint "statix" pkgs.statix "statix check .";
                 deadnix = lint "deadnix" pkgs.deadnix "deadnix --fail .";
+              }
+              # Evaluates every host, so once is enough.
+              // lib.optionalAttrs (system == "x86_64-linux") {
+                access-policy = import ./tests/access-policy.nix {
+                  inherit lib pkgs;
+                  inherit (inputs.self) nixosConfigurations;
+                };
               };
 
             packages.kexec-installer =
@@ -214,11 +242,7 @@
               runtimeInputs = [
                 pkgs.nixos-anywhere
                 pkgs.openssh
-                pkgs.curl
                 pkgs.jq
-                pkgs.cpio
-                pkgs.gzip
-                pkgs.gnutar
               ];
               # `op` comes from the host, for 1Password's desktop integration.
               text =
@@ -229,8 +253,7 @@
                       lib.mapAttrs (name: spec: {
                         inherit (spec) system;
                         inherit (inputs.self.nixosConfigurations.${name}.config.homelab.nodes.${name})
-                          tailscaleName
-                          tailscaleTags
+                          ip
                           bootstrapTarget
                           ;
                       }) hosts
@@ -249,14 +272,12 @@
               ];
               text = ''
                 if [ "$#" -eq 0 ]; then
-                  set -- ${lib.concatStringsSep " " (lib.attrNames deployTargets)}
+                  set -- ${lib.concatStringsSep " " (lib.attrNames hosts)}
                 fi
 
-                colmena apply --on "$(IFS=,; echo "$*")"
-
-                for host in "$@"; do
-                  ssh -o StrictHostKeyChecking=accept-new "deploy@$host" sudo deploy-confirm
-                done
+                on=$(IFS=,; echo "$*")
+                colmena apply --on "$on"
+                colmena exec --on "$on" -- sudo deploy-confirm
               '';
             };
             # Compares committed HEAD only; uncommitted edits are ignored.
