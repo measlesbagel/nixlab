@@ -19,7 +19,9 @@ through OIDC workload identity.
    exists only for changed hosts, so it cannot be required by name.)
    `.github/CODEOWNERS` makes the owner review every PR, so agent accounts
    cannot merge their own. This ruleset is the deploy gate: every host
-   applies whatever lands on `main`.
+   applies whatever lands on `main`, provided GitHub signed the tip commit
+   (`modules/comin.nix`). Merge in the web UI; a commit pushed straight to
+   `main`, even by an admin, is not deployed until a signed one lands on top.
 4. Environment `production`: deployment branches limited to `main`; no
    reviewers.
 5. Secret scanning with push protection, Dependabot alerts and private
