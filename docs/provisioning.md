@@ -1,8 +1,8 @@
 # Provisioning a host
 
 `nix run .#provision -- <host>` kexecs the machine's current OS into an
-installer that joins the tailnet as `<host>-installer`, installs the host
-with nixos-anywhere, and waits for `deploy@<host>` to come back.
+installer that keeps its LAN address, installs the host with nixos-anywhere,
+and waits for `deploy@<ip>` to come back with the host key it was given.
 
 ```console
 # first install, taking over the machine's current OS (bootstrapTarget)
@@ -15,8 +15,10 @@ nix run .#provision -- seladonia
 nix run .#provision -- seladonia --bootstrap --dry-run
 ```
 
-Run it from an admin machine (chilense) on the tailnet, signed in to the
-1Password CLI with access to the `private` vault. CI never provisions: old
+Run it from chilense, signed in to the 1Password CLI with access to the
+`private` vault. A reinstall logs in as `deploy@<ip>`, so the break-glass key
+(or an opkssh login) must be in your agent; see
+[remote-access.md](remote-access.md). CI never provisions: old
 OSes are only reachable on the LAN, and an install wipes disks.
 
 It reads two items from `private`:
@@ -25,13 +27,15 @@ It reads two items from `private`:
   host shares on the `homelab` vault, installed at `/etc/opnix-token`.
   Override with `OPNIX_TOKEN` or `OPNIX_TOKEN_REF`.
 - `tailscale-provision/{client-id,client-secret}`: the provisioning OAuth
-  client ([ci-setup.md](ci-setup.md#tailscale)). It mints two single-use keys
-  that expire in a day: an ephemeral one for the installer (`tag:instar`)
-  and one with the host's tags. Pass `TS_INSTALLER_AUTHKEY` /
-  `TS_HOST_AUTHKEY` to use keys made by hand instead.
+  client ([ci-setup.md](ci-setup.md#tailscale)), until Tailscale is removed.
+  It mints a single-use key with the host's tags that expires in a day. Pass
+  `TS_HOST_AUTHKEY` to use a key made by hand instead.
+
+It also makes the host's SSH host key and prints the `sshHostKey` line to
+commit in `modules/topology.nix`.
 
 Nothing secret reaches a disk or the store: the keys and token stay in a
-private directory under `$XDG_RUNTIME_DIR` (tmpfs), deleted on exit; each join
+private directory under `$XDG_RUNTIME_DIR` (tmpfs), deleted on exit; the join
 key is deleted once it has joined; the OAuth client secret never leaves the
 machine running provision.
 
@@ -67,8 +71,8 @@ other copy is on chilense, whose provisioning formats that disk. Follow
   hour): the NVIDIA kernel is in no public cache. Later deploys come from the
   lab cache.
 - **The installer's stock kernel may not get Ethernet** on the RTL8127
-  (mainline `r8169`). If it never joins the tailnet, fall back to a USB
-  install; keep a DGX OS recovery USB to hand either way.
+  (mainline `r8169`). If it never comes back on its address, fall back to
+  a USB install; keep a DGX OS recovery USB to hand either way.
 - Do elegans first; leetzi stays on DGX OS until elegans checks out.
 
 ## Reinstalls

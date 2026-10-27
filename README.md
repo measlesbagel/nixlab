@@ -11,6 +11,7 @@ Bare-metal NixOS homelab monorepo, the public source of truth for the fleet.
 - `home/measles/`: personal hjem config (hjem-rum modules)
 - `installer/`, `scripts/`: the kexec installer and `provision`
 - `secrets/`: secret contracts; never values
+- `tests/`: evaluation checks run by `nix flake check`
 - `.github/workflows/`: CI/CD
 
 ## Fleet
@@ -47,9 +48,15 @@ GitHub. Hosts reboot into a new kernel by themselves at night, once idle
 PRs run `ci.yml` (checks and a build of each changed host); it publishes
 nothing. One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
 
+## Remote access
+
+WireGuard to seladonia for getting in, and SSH logins through opkssh and
+Pocket ID, with a LAN-only break-glass key:
+[docs/remote-access.md](docs/remote-access.md).
+
 ## Provisioning
 
-`nix run .#provision -- <host>` installs over the tailnet:
+`nix run .#provision -- <host>` installs over the LAN:
 [docs/provisioning.md](docs/provisioning.md).
 
 ## Models

@@ -29,4 +29,13 @@ in
   };
 
   networking.firewall.trustedInterfaces = [ "tailscale0" ];
+  # Match the nftables firewall (modules/ssh.nix) rather than rely on its
+  # auto-detection.
+  systemd.services.tailscaled.environment.TS_DEBUG_FIREWALL_MODE = "nftables";
+
+  homelab.watchdog.healthChecks = [
+    "systemctl is-active --quiet tailscaled.service"
+    "${lib.getExe pkgs.tailscale} status --json | ${lib.getExe pkgs.jq} -e '.BackendState == \"Running\"' > /dev/null"
+  ];
+  systemd.services.deploy-watchdog.after = [ "tailscaled.service" ];
 }
