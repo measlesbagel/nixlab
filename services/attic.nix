@@ -41,6 +41,6 @@ in
     services = [ "atticd" ];
   };
 
-  # Hosts pull over the LAN; CI pushes over the tailnet (trusted interface).
+  # Hosts pull and push over the LAN.
   networking.firewall.allowedTCPPorts = [ config.homelab.cache.port ];
 }

@@ -1,8 +1,9 @@
 # CI/CD one-time setup
 
-Configured outside the repo, once. No secret goes in GitHub: Tailscale access
-uses OIDC workload identity, and the cache push token is minted per run on
-albipes.
+Configured outside the repo, once. GitHub only verifies: hosts pull `main`
+and deploy themselves (`modules/comin.nix`), so no secret goes in GitHub and
+nothing in it reaches the lab. The policy workflow reaches Tailscale's API
+through OIDC workload identity.
 
 ## GitHub
 
@@ -14,21 +15,20 @@ albipes.
    that cannot approve PRs.
 3. Ruleset `main`: require a pull request with code-owner review and the
    `Secret scan`, `Workflow lint` and `Flake check` status checks; block
-   force pushes and deletion; repository admins bypass. (`Build <host>` and
-   `Release <host>` exist only for changed hosts, so they cannot be required
-   by name.) `.github/CODEOWNERS` makes the owner review every PR, so agent
-   accounts cannot merge their own.
+   force pushes and deletion; repository admins bypass. (`Build <host>`
+   exists only for changed hosts, so it cannot be required by name.)
+   `.github/CODEOWNERS` makes the owner review every PR, so agent accounts
+   cannot merge their own. This ruleset is the deploy gate: every host
+   applies whatever lands on `main`.
 4. Environment `production`: deployment branches limited to `main`; no
    reviewers.
 5. Secret scanning with push protection, Dependabot alerts and private
    vulnerability reporting.
 6. First push: `[skip ci]` in the head commit, then
-   `gh workflow disable cd` and `gh workflow disable tailscale-policy` until
-   the hosts are provisioned.
+   `gh workflow disable tailscale-policy` until the hosts are provisioned.
 7. Repository variables (public identifiers, not secrets): `TS_TAILNET`,
    `TS_POLICY_READ_CLIENT_ID`, `TS_POLICY_READ_AUDIENCE`,
-   `TS_POLICY_WRITE_CLIENT_ID`, `TS_POLICY_WRITE_AUDIENCE`,
-   `TS_DEPLOY_CLIENT_ID`, `TS_DEPLOY_AUDIENCE`.
+   `TS_POLICY_WRITE_CLIENT_ID`, `TS_POLICY_WRITE_AUDIENCE`.
 
 ## Tailscale
 
@@ -50,7 +50,6 @@ albipes.
    | --- | --- | --- |
    | policy test | `repo:measlesbagel/nixlab:pull_request` | policy file, read-only |
    | policy apply | `repo:measlesbagel/nixlab:environment:production` | policy file |
-   | deploy | `repo:measlesbagel/nixlab:environment:production` | `auth_keys`, tag `tag:hatch` |
 
    Use each credential's client ID and audience for the matching variables.
 
@@ -58,21 +57,16 @@ albipes.
 
 Once albipes and chilense are up, make them the signing nodes and enable
 Tailnet Lock; the disablement secrets go in the `private` vault. In the same
-change:
-
-- `provision.sh` pre-signs the keys it mints with `tailscale lock sign`, so
-  it must run on a signing node.
-- `cd.yml` cannot use the OAuth/OIDC identity on a locked tailnet: the action
-  needs a reusable, ephemeral, pre-signed auth key with `tag:hatch`, stored
-  as a `production` environment secret and rotated before its 90-day expiry.
-  `tag:hatch` can deploy every host, so treat that key accordingly.
+change, `provision.sh` pre-signs the keys it mints with `tailscale lock sign`,
+so it must run on a signing node. No CI job joins the tailnet.
 
 ## Lab binary cache
 
-CI builds each changed host on a runner of its architecture
-(`ubuntu-24.04-arm` for aarch64), pushes the closure to Attic on albipes
-(`services/attic.nix`) and deploys. Hosts take what they can from the cache
-over the LAN and the rest from the runner.
+Each host builds its own system, pulling from Attic on albipes
+(`services/attic.nix`) over the LAN, then cache.nixos.org, and pushes what it
+built back to Attic (`modules/cache.nix`). leetzi hands its builds to elegans
+(`modules/remote-builder.nix`), so the Spark kernel compiles once. CI never
+writes to the cache: a push token can poison what every host substitutes.
 
 The token-signing key lives at `op://homelab/attic-server-env/env`. atticd
 generates the NAR signing key when the cache is created, so once albipes
@@ -87,13 +81,23 @@ nix run nixpkgs#attic-client -- cache create local:nixlab --public
 nix run nixpkgs#attic-client -- cache info local:nixlab   # prints the public key
 ```
 
-Commit the printed public key as `homelab.cache.publicKey`, at its default in
-`modules/cache.nix`; it is public by design. Until it is set, hosts skip the
-cache.
+Then make the hosts' push token and store it at `op://homelab/attic-push/token`
+before the change that sets the public key merges:
 
-A manual `nix run .#deploy -- <host>` builds on the machine running it, so
-deploying an aarch64 host from chilense only works for closures CI has
-already pushed.
+```console
+sudo atticd-atticadm make-token --sub hosts --validity 1y --push nixlab --pull nixlab
+```
+
+Commit the printed public key as `homelab.cache.publicKey`, at its default in
+`modules/cache.nix`; it is public by design. Until it is set, hosts neither
+pull from nor push to the cache.
 
 The cache is public for reads, which is safe because nothing secret is ever in
-the Nix store. It is reachable only on the LAN and, for CI, the tailnet.
+the Nix store. It is reachable only on the LAN.
+
+## Remote builder (leetzi → elegans)
+
+Once both Sparks are provisioned, commit each one's
+`/etc/ssh/ssh_host_ed25519_key.pub` as `sshHostKey` in `modules/topology.nix`.
+leetzi then builds on elegans as `nix-builder` over the ConnectX-7 link,
+authenticated by its host key; until both are set, each Spark builds alone.
