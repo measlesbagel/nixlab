@@ -1,6 +1,12 @@
-# Rolls back a switch the deployer does not confirm, and a never-proven boot
-# that never becomes manageable (ssh + tailscale, not is-system-running).
-{ lib, pkgs, ... }:
+# Rolls back a switch nobody confirms (comin's hook in modules/comin.nix, or
+# `nix run .#deploy`), and a never-proven boot that never becomes manageable
+# (ssh + tailscale, not is-system-running).
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   stateDir = "/var/lib/deploy-watchdog";
   runDir = "/run/deploy-watchdog";
@@ -30,6 +36,8 @@ let
       deploy-health
       mkdir -p ${stateDir}
       readlink -f /run/current-system > ${stateDir}/confirmed
+      # deploy-revert's target must survive garbage collection.
+      ln -sfn "$(cat ${stateDir}/confirmed)" /nix/var/nix/gcroots/deploy-confirmed
       rm -f ${runDir}/pending
 
       # Else a power cut with the internet down rolls back a confirmed
@@ -44,9 +52,34 @@ let
     '';
   };
 
+  # comin switches through its own profile (system-profiles/comin), so
+  # `nixos-rebuild --rollback` would pick a stale system generation. Setting
+  # the system profile also makes the target the default boot entry.
+  revert = pkgs.writeShellApplication {
+    name = "deploy-revert";
+    runtimeInputs = [
+      pkgs.coreutils
+      config.nix.package
+    ];
+    text = ''
+      target=$(cat ${stateDir}/confirmed 2> /dev/null || true)
+      if [ -n "$target" ] && [ -x "$target/bin/switch-to-configuration" ] \
+        && [ "$target" != "$(readlink -f /run/current-system)" ]; then
+        echo "reverting to $target"
+        nix-env --profile /nix/var/nix/profiles/system --set "$target"
+        "$target/bin/switch-to-configuration" switch
+      else
+        /run/current-system/sw/bin/nixos-rebuild --rollback switch
+      fi
+    '';
+  };
+
   rollback = pkgs.writeShellApplication {
     name = "deploy-rollback";
-    runtimeInputs = [ pkgs.coreutils ];
+    runtimeInputs = [
+      pkgs.coreutils
+      revert
+    ];
     text = ''
       deadline=$((SECONDS + ${toString confirmWindow}))
       while [ -e ${runDir}/pending ] && [ "$SECONDS" -lt "$deadline" ]; do
@@ -59,7 +92,7 @@ let
 
       echo "deploy not confirmed within ${toString confirmWindow}s — rolling back"
       rm -f ${runDir}/pending
-      /run/current-system/sw/bin/nixos-rebuild --rollback switch
+      deploy-revert
     '';
   };
 
@@ -70,6 +103,7 @@ let
       pkgs.systemd
       health
       confirm
+      revert
     ];
     text = ''
       marker="${stateDir}/rolled-back-$(cat /proc/sys/kernel/random/boot_id)"
@@ -95,7 +129,7 @@ let
 
       echo "host unmanageable after boot — rolling back"
       touch "$marker"
-      /run/current-system/sw/bin/nixos-rebuild --rollback switch
+      deploy-revert
       systemctl reboot
     '';
   };

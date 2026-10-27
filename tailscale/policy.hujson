@@ -13,7 +13,6 @@
 		"tag:hapalotremus": ["autogroup:admin", "tag:molt"], // nas
 		"tag:homoeomma": ["autogroup:admin", "tag:molt"], // workstations
 		"tag:cyriocosmus": ["autogroup:admin", "tag:molt"], // DGX Sparks
-		"tag:hatch":  ["autogroup:admin"], // CI runners
 		// Temporary kexec installers made by `nix run .#provision`.
 		"tag:instar": ["autogroup:admin", "tag:molt"],
 	},
@@ -23,14 +22,11 @@
 		// Admins reach every host on every port.
 		{"src": ["autogroup:admin"], "dst": ["tag:typhochlaena", "tag:hapalotremus", "tag:homoeomma", "tag:cyriocosmus"], "ip": ["*"]},
 
-		// CI and the deploy desktop only need SSH (Tailscale SSH on :22).
-		{"src": ["tag:hatch", "tag:homoeomma"], "dst": ["tag:typhochlaena", "tag:hapalotremus", "tag:homoeomma", "tag:cyriocosmus"], "ip": ["tcp:22"]},
+		// The break-glass deploy desktop only needs SSH (Tailscale SSH on :22).
+		{"src": ["tag:homoeomma"], "dst": ["tag:typhochlaena", "tag:hapalotremus", "tag:homoeomma", "tag:cyriocosmus"], "ip": ["tcp:22"]},
 
-		// CI pushes built closures to the lab binary cache (services/attic.nix).
-		{"src": ["tag:hatch"], "dst": ["tag:hapalotremus"], "ip": ["tcp:7313"]},
-
-		// Whoever provisions (an admin, chilense, CI) reaches the installer.
-		{"src": ["tag:hatch", "tag:homoeomma", "autogroup:admin"], "dst": ["tag:instar"], "ip": ["tcp:22"]},
+		// Whoever provisions (an admin, chilense) reaches the installer.
+		{"src": ["tag:homoeomma", "autogroup:admin"], "dst": ["tag:instar"], "ip": ["tcp:22"]},
 
 		// albipes pulls ZFS replicas from seladonia and chilense over SSH.
 		{"src": ["tag:hapalotremus"], "dst": ["tag:typhochlaena", "tag:homoeomma"], "ip": ["tcp:22"]},
@@ -40,7 +36,7 @@
 	"ssh": [
 		{
 			"action": "accept",
-			"src":    ["tag:hatch", "tag:homoeomma", "autogroup:admin"],
+			"src":    ["tag:homoeomma", "autogroup:admin"],
 			"dst":    ["tag:typhochlaena", "tag:hapalotremus", "tag:homoeomma", "tag:cyriocosmus"],
 			"users":  ["deploy"],
 		},
@@ -58,7 +54,7 @@
 		},
 		{
 			"action": "accept",
-			"src":    ["tag:hatch", "tag:homoeomma", "autogroup:admin"],
+			"src":    ["tag:homoeomma", "autogroup:admin"],
 			"dst":    ["tag:instar"],
 			"users":  ["root"],
 		},
@@ -70,9 +66,9 @@
 			"deny":   ["tag:typhochlaena:22", "tag:hapalotremus:22", "tag:homoeomma:22", "tag:hapalotremus:7313"],
 		},
 		{
-			"src":    "tag:hatch",
-			"accept": ["tag:typhochlaena:22", "tag:hapalotremus:22", "tag:homoeomma:22", "tag:cyriocosmus:22", "tag:hapalotremus:7313"],
-			"deny":   ["tag:typhochlaena:5432", "tag:hapalotremus:2049", "tag:hapalotremus:9000", "tag:typhochlaena:7313"],
+			"src":    "tag:homoeomma",
+			"accept": ["tag:typhochlaena:22", "tag:hapalotremus:22", "tag:cyriocosmus:22"],
+			"deny":   ["tag:typhochlaena:5432", "tag:hapalotremus:2049", "tag:hapalotremus:9000", "tag:hapalotremus:7313"],
 		},
 		{
 			"src":    "tag:hapalotremus",
@@ -91,7 +87,7 @@
 
 	"sshTests": [
 		{
-			"src":    "tag:hatch",
+			"src":    "tag:homoeomma",
 			"dst":    ["tag:instar"],
 			"accept": ["root"],
 		},
@@ -101,8 +97,8 @@
 			"deny":   ["root"],
 		},
 		{
-			"src":    "tag:hatch",
-			"dst":    ["tag:typhochlaena", "tag:hapalotremus", "tag:homoeomma", "tag:cyriocosmus"],
+			"src":    "tag:homoeomma",
+			"dst":    ["tag:typhochlaena", "tag:hapalotremus", "tag:cyriocosmus"],
 			"accept": ["deploy"],
 			"deny":   ["root", "syncoid", "measles"],
 		},

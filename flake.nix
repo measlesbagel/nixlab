@@ -20,6 +20,9 @@
     nix-rtl8159.url = "github:measlesbagel/nix-rtl8159";
     nix-rtl8159.inputs.nixpkgs.follows = "nixpkgs";
 
+    comin.url = "github:nlewo/comin";
+    comin.inputs.nixpkgs.follows = "nixpkgs";
+
     colmena.url = "github:zhaofengli/colmena";
     colmena.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -54,6 +57,7 @@
           ./modules/reboot.nix
           ./modules/ups.nix
           ./modules/cache.nix
+          ./modules/comin.nix
         ];
 
         # `system` also picks the CI runner that builds the host.
@@ -98,6 +102,7 @@
             dir = ./hosts/leetzi;
             modules = [
               ./modules/spark.nix
+              ./modules/remote-builder.nix
               ./services/model-sync.nix
             ];
           };
@@ -106,6 +111,7 @@
             dir = ./hosts/elegans;
             modules = [
               ./modules/spark.nix
+              ./modules/remote-builder.nix
               ./services/model-sync.nix
             ];
           };
@@ -143,7 +149,7 @@
         ];
 
         flake = {
-          # One evaluation: CI builds exactly the system colmena deploys.
+          # One evaluation: CI builds exactly the system comin and colmena deploy.
           nixosConfigurations = inputs.self.colmenaHive.nodes;
 
           colmenaHive = inputs.colmena.lib.makeHive (
@@ -158,8 +164,8 @@
               deployment = {
                 targetUser = "deploy";
                 tags = [ "homelab" ];
-                # Hosts never build, and never depend on the lab cache being up.
-                buildOnTarget = false;
+                # As comin does: the host builds, pulling what it can from Attic.
+                buildOnTarget = true;
                 # Tailscale SSH authenticates the node, so first contact is safe.
                 sshOptions = [
                   "-o"
