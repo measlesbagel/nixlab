@@ -30,22 +30,29 @@ in
     trim.enable = true;
   };
 
-  # disko sets each dataset's mountpoint property and also mounts it through
-  # fileSystems, so `zfs mount -a` races those mounts and fails on "dataset is
-  # busy". Undeclared datasets, such as syncoid's replicas, stay unmounted.
-  systemd.services.zfs-mount.enable = false;
-
   # Resilvers and manual scrubs run outside any unit.
   homelab.reboot.busyWhen."a scrub or resilver" =
     "${config.boot.zfs.package}/bin/zpool status | grep 'in progress since' > /dev/null";
 
+  # Each dataset that fileSystems mounts is `mountpoint=legacy` in its host's
+  # disko.nix. A real path makes zfs-mount.service mount it too, racing the
+  # mount unit on "dataset is busy". syncoid's replicas inherit legacy from
+  # tank/backups, so they stay unmounted.
   disko.tests.extraChecks = ''
-    with subtest("every pool imports with its layout, and every dataset mounts where disko puts it"):
+    with subtest("zfs-mount and the mount units did not race"):
+        journal = machine.succeed("journalctl -b --no-pager -o cat")
+        busy = [line for line in journal.splitlines() if "dataset is busy" in line or "zfs_mount_at() failed" in line]
+        assert not busy, "\n".join(busy)
+
+    with subtest("every pool imports with its layout, and every dataset is legacy and mounts where disko puts it"):
         for pool, mode in ${builtins.toJSON modes}.items():
             status = machine.succeed(f"zpool status {pool}")
             assert "state: ONLINE" in status, status
             assert mode in status, status
         for mountpoint, dataset in ${builtins.toJSON mounts}.items():
-            machine.succeed(f'[ "$(findmnt -no SOURCE {mountpoint})" = {dataset} ]')
+            machine.succeed(
+                f'[ "$(findmnt -no SOURCE {mountpoint})" = {dataset} ]',
+                f'[ "$(zfs get -H -o value mountpoint {dataset})" = legacy ]',
+            )
   '';
 }

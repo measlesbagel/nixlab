@@ -43,23 +43,28 @@
         "local/root" = {
           type = "zfs_fs";
           mountpoint = "/";
+          options.mountpoint = "legacy";
         };
         "local/nix" = {
           type = "zfs_fs";
           mountpoint = "/nix";
+          options.mountpoint = "legacy";
         };
         "safe/var-lib" = {
           type = "zfs_fs";
           mountpoint = "/var/lib";
+          options.mountpoint = "legacy";
         };
         "safe/navidrome" = {
           type = "zfs_fs";
           mountpoint = "/var/lib/navidrome";
+          options.mountpoint = "legacy";
         };
         "safe/postgres" = {
           type = "zfs_fs";
           mountpoint = "/var/lib/postgresql";
           options = {
+            mountpoint = "legacy";
             recordsize = "8K";
             logbias = "throughput";
           };
