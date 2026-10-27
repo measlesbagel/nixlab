@@ -26,7 +26,6 @@ let
     text = builtins.readFile ../scripts/wg-test-peer.sh;
   };
   peerIp = lib.concatStringsSep "." (lib.init (lib.splitString "." wireguard.address) ++ [ "254" ]);
-  # What a peer should get back.
   lookups = lib.concatLines (
     lib.mapAttrsToList
       (name: ip: ''[ "$(ip netns exec peer ${dig} +short @${wireguard.address} ${name})" = ${ip} ]'')

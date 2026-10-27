@@ -86,7 +86,6 @@ jobs:
           echo "changed hosts: $hosts"
           # All aarch64 hosts build in one job. Today those are the two Sparks,
           # which share their whole NVIDIA kernel, so it compiles once.
-          # vmTests: the hosts the job also boots in a VM.
           builds=$(jq -c '
             map(select(.system != "aarch64-linux") | {name: .host, system, hosts: .host, vmTests: (if .vmTest then .host else "" end)})
             + (map(select(.system == "aarch64-linux"))

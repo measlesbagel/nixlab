@@ -28,7 +28,7 @@
   };
 
   disko.tests.extraChecks = ''
-    with subtest("measles logs in to his hjem packages on PATH"):
+    with subtest("measles logs in with hjem packages on PATH"):
         machine.succeed("runuser -l measles -c 'command -v ${
           toString (map (p: baseNameOf (lib.getExe p)) config.hjem.users.measles.packages)
         }'")
