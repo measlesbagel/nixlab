@@ -19,14 +19,6 @@ let
       target = "tank/backups/${host}-${baseNameOf dataset}";
     }) inputs.self.nixosConfigurations.${host}.config.homelab.zfs.replicate
   ) sources;
-
-  # modules/replication.nix: the sources accept the key once it is committed.
-  address =
-    host:
-    if config.homelab.zfs.pullKey != null then
-      config.homelab.nodes.${host}.ip
-    else
-      config.homelab.nodes.${host}.tailscaleName;
 in
 {
   services.syncoid = {
@@ -40,7 +32,7 @@ in
       map (
         r:
         lib.nameValuePair "${r.host}-${baseNameOf r.dataset}" {
-          source = "syncoid@${address r.host}:${r.dataset}";
+          source = "syncoid@${config.homelab.nodes.${r.host}.ip}:${r.dataset}";
           inherit (r) target;
           recvOptions = "u";
           service = {

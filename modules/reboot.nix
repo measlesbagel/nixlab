@@ -55,7 +55,7 @@ let
       )}
 
       ${lib.optionalString cfg.whenLoggedOut ''
-        # deploy's Tailscale SSH sessions are automation.
+        # deploy's sessions are automation.
         users=$(loginctl list-sessions --json=short \
           | jq -r '[.[] | select(.class == "user" and .user != "deploy") | .user] | unique | join(" ")')
         if [ -n "$users" ]; then

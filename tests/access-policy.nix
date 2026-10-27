@@ -1,5 +1,4 @@
-# Who may log in as whom from where: the tests tailscale/policy.hujson had,
-# checked against each host's sshd AllowUsers (modules/ssh.nix). nftables
+# Who may log in as whom from where, checked against each host's sshd AllowUsers (modules/ssh.nix). nftables
 # opens port 22 to exactly these sources.
 {
   lib,

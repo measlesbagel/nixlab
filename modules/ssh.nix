@@ -1,7 +1,6 @@
 # OpenSSH logins: opkssh against Pocket ID for people, the 1Password
 # break-glass key from the LAN, and an AllowUsers list of user@source pairs
-# that nftables mirrors on port 22. Tailscale SSH bypasses all of this until
-# it is removed.
+# that nftables mirrors on port 22.
 { config, lib, ... }:
 let
   inherit (lib) mkOption types;
@@ -85,7 +84,7 @@ in
       publicKey = node.sshHostKey;
     }) (lib.filterAttrs (_: node: node.sshHostKey != null) nodes);
 
-    # WireGuard peers are admins and reach every port, as on the tailnet.
+    # WireGuard peers are admins and reach every port.
     networking.nftables.enable = true;
     networking.firewall.extraInputRules = ''
       ip saddr ${wireguard.subnet} accept

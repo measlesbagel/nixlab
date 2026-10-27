@@ -71,7 +71,7 @@ jobs:
           echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
           echo "changed hosts: $hosts"
 
-  # No secrets and no tailnet access.
+  # No secrets and no lab access.
   build:
     name: Build ${{ matrix.host }}
     needs: changed

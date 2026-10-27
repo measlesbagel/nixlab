@@ -21,23 +21,16 @@ Run it from chilense, signed in to the 1Password CLI with access to the
 [remote-access.md](remote-access.md). CI never provisions: old
 OSes are only reachable on the LAN, and an install wipes disks.
 
-It reads two items from `private`:
-
-- `nixlab-opnix/credential`: the token of the read-only service account every
-  host shares on the `homelab` vault, installed at `/etc/opnix-token`.
-  Override with `OPNIX_TOKEN` or `OPNIX_TOKEN_REF`.
-- `tailscale-provision/{client-id,client-secret}`: the provisioning OAuth
-  client ([ci-setup.md](ci-setup.md#tailscale)), until Tailscale is removed.
-  It mints a single-use key with the host's tags that expires in a day. Pass
-  `TS_HOST_AUTHKEY` to use a key made by hand instead.
+It reads `nixlab-opnix/credential` from `private`: the token of the
+read-only service account every host shares on the `homelab` vault,
+installed at `/etc/opnix-token`. Override with `OPNIX_TOKEN` or
+`OPNIX_TOKEN_REF`.
 
 It also makes the host's SSH host key and prints the `sshHostKey` line to
 commit in `modules/topology.nix`.
 
-Nothing secret reaches a disk or the store: the keys and token stay in a
-private directory under `$XDG_RUNTIME_DIR` (tmpfs), deleted on exit; the join
-key is deleted once it has joined; the OAuth client secret never leaves the
-machine running provision.
+Nothing secret reaches a disk or the store: the host key and token stay in a
+private directory under `$XDG_RUNTIME_DIR` (tmpfs), deleted on exit.
 
 ## Requirements on the target
 
@@ -77,5 +70,5 @@ other copy is on chilense, whose provisioning formats that disk. Follow
 
 ## Reinstalls
 
-Remove the old machine in the Tailscale admin console first, or the
-reinstalled host joins as `<name>-1`.
+A reinstall gets a new host key: commit the `sshHostKey` that `provision`
+prints, or deploys and the other hosts refuse it.
