@@ -5,5 +5,12 @@
 {
   config = lib.mkIf config.services.nfs.server.enable {
     systemd.services.nfs-mountd.preStart = "touch /var/lib/nfs/etab";
+
+    # Its parent exits 0 as the child dies, so the unit can end inactive with
+    # Result=success while nfs-server stays up.
+    disko.tests.extraChecks = ''
+      with subtest("rpc.mountd runs behind the NFS server"):
+          machine.succeed("systemctl is-active nfs-mountd.service", "pgrep -x rpc.mountd")
+    '';
   };
 }
