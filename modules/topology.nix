@@ -8,6 +8,55 @@ in
       type = types.str;
       default = "measlesbagel.dev";
     };
+    lan.subnet = mkOption {
+      type = types.str;
+      default = "192.168.4.0/24";
+    };
+    breakGlassKey = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Public half of the break-glass SSH key in 1Password, for when Pocket ID
+        or seladonia is down. Accepted for measles and deploy from the LAN only.
+      '';
+    };
+    wireguard = {
+      endpoint = mkOption {
+        type = types.str;
+        default = "seladonia";
+        description = "The one host that terminates WireGuard; the router forwards its port here.";
+      };
+      subnet = mkOption {
+        type = types.str;
+        default = "10.100.0.0/24";
+      };
+      address = mkOption {
+        type = types.str;
+        default = "10.100.0.1";
+        description = "The endpoint's address in the subnet.";
+      };
+      port = mkOption {
+        type = types.port;
+        default = 51820;
+      };
+      publicKey = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "The endpoint's public key, generated on its first boot (`wg show wg0 public-key`).";
+      };
+      peers = mkOption {
+        type = types.attrsOf (
+          types.submodule {
+            options = {
+              ip = mkOption { type = types.str; };
+              publicKey = mkOption { type = types.str; };
+            };
+          }
+        );
+        default = { };
+        description = "Remote-access devices. Each makes its own key; every peer is an admin.";
+      };
+    };
     nodes = mkOption {
       type = types.attrsOf (
         types.submodule {

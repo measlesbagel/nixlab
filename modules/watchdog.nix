@@ -1,6 +1,6 @@
 # Rolls back a switch nobody confirms (comin's hook in modules/comin.nix, or
 # `nix run .#deploy`), and a never-proven boot that never becomes manageable
-# (ssh + tailscale, not is-system-running).
+# (ssh and the remote-access path, not is-system-running).
 {
   config,
   lib,
@@ -14,16 +14,10 @@ let
 
   health = pkgs.writeShellApplication {
     name = "deploy-health";
-    runtimeInputs = [
-      pkgs.systemd
-      pkgs.tailscale
-      pkgs.jq
-    ];
-    text = ''
-      systemctl is-active --quiet sshd.service
-      systemctl is-active --quiet tailscaled.service
-      tailscale status --json | jq -e '.BackendState == "Running"' > /dev/null
-    '';
+    runtimeInputs = [ pkgs.systemd ];
+    text = lib.concatLines (
+      [ "systemctl is-active --quiet sshd.service" ] ++ config.homelab.watchdog.healthChecks
+    );
   };
 
   confirm = pkgs.writeShellApplication {
@@ -135,61 +129,66 @@ let
   };
 in
 {
-  environment.systemPackages = [
-    health
-    confirm
-  ];
-
-  boot.loader.systemd-boot.bootCounting.enable = true;
-  boot.kernelParams = [ "panic=30" ];
-
-  # Live switches only: boot activation and fresh installs must never start a
-  # countdown.
-  system.activationScripts.deployWatchdogArm = {
-    deps = [ "specialfs" ];
-    text = ''
-      if [ "''${NIXOS_ACTION:-}" = switch ] \
-        && [ -f ${stateDir}/confirmed ] \
-        && [ "$(cat ${stateDir}/confirmed)" != "$systemConfig" ]; then
-        mkdir -p ${runDir}
-        echo "$systemConfig" > ${runDir}/pending
-      fi
-    '';
+  options.homelab.watchdog.healthChecks = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    description = "Shell lines, beyond sshd, that must all succeed for the host to count as manageable.";
   };
 
-  systemd.paths.deploy-rollback = {
-    wantedBy = [ "multi-user.target" ];
-    pathConfig.PathExists = "${runDir}/pending";
-  };
-
-  systemd.services.deploy-rollback = {
-    description = "Roll back a deploy the deployer did not confirm";
-    # Never restart mid-countdown when a deploy changes this unit.
-    restartIfChanged = false;
-    stopIfChanged = false;
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = lib.getExe rollback;
-    };
-  };
-
-  systemd.services.deploy-watchdog = {
-    description = "Boot health gate with automatic rollback";
-    wantedBy = [ "multi-user.target" ];
-    after = [
-      "network-online.target"
-      "tailscaled.service"
+  config = {
+    environment.systemPackages = [
+      health
+      confirm
     ];
-    wants = [ "network-online.target" ];
-    # Restarting it on switch would block the deploy.
-    restartIfChanged = false;
-    stopIfChanged = false;
 
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      StateDirectory = "deploy-watchdog";
-      ExecStart = lib.getExe bootGate;
+    boot.loader.systemd-boot.bootCounting.enable = true;
+    boot.kernelParams = [ "panic=30" ];
+
+    # Live switches only: boot activation and fresh installs must never start a
+    # countdown.
+    system.activationScripts.deployWatchdogArm = {
+      deps = [ "specialfs" ];
+      text = ''
+        if [ "''${NIXOS_ACTION:-}" = switch ] \
+          && [ -f ${stateDir}/confirmed ] \
+          && [ "$(cat ${stateDir}/confirmed)" != "$systemConfig" ]; then
+          mkdir -p ${runDir}
+          echo "$systemConfig" > ${runDir}/pending
+        fi
+      '';
+    };
+
+    systemd.paths.deploy-rollback = {
+      wantedBy = [ "multi-user.target" ];
+      pathConfig.PathExists = "${runDir}/pending";
+    };
+
+    systemd.services.deploy-rollback = {
+      description = "Roll back a deploy the deployer did not confirm";
+      # Never restart mid-countdown when a deploy changes this unit.
+      restartIfChanged = false;
+      stopIfChanged = false;
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = lib.getExe rollback;
+      };
+    };
+
+    systemd.services.deploy-watchdog = {
+      description = "Boot health gate with automatic rollback";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      # Restarting it on switch would block the deploy.
+      restartIfChanged = false;
+      stopIfChanged = false;
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        StateDirectory = "deploy-watchdog";
+        ExecStart = lib.getExe bootGate;
+      };
     };
   };
 }
