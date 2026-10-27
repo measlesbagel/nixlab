@@ -38,13 +38,21 @@ in
         machine.succeed('[ "$(systemd-detect-virt)" = kvm ]')
       '')
       (lib.mkAfter ''
-        with subtest("only units the VM cannot run have failed"):
+        with subtest("only units the VM cannot run have failed or are restarting"):
+            from datetime import timedelta
+
             unverifiable = ${builtins.toJSON unverifiable}
-            failed = machine.succeed("systemctl list-units --failed --plain --no-legend | cut -d' ' -f1").split()
+            machine.execute("systemctl is-system-running --wait", timeout=timedelta(minutes=2))
+            # A unit that failed once early may still be waiting out RestartSec.
+            for _ in range(60):
+                broken = machine.succeed("systemctl list-units --state=failed,auto-restart --plain --no-legend | cut -d' ' -f1").split()
+                unexpected = [unit for unit in broken if unit not in unverifiable]
+                if not unexpected:
+                    break
+                machine.sleep(duration=timedelta(seconds=1))
             for unit, reason in sorted(unverifiable.items()):
-                print(f"not verified: {unit} ({reason}){', failed' if unit in failed else '''}")
-            unexpected = [unit for unit in failed if unit not in unverifiable]
-            assert not unexpected, f"failed: {' '.join(unexpected)}"
+                print(f"not verified: {unit} ({reason}){', failed or restarting' if unit in broken else '''}")
+            assert not unexpected, f"failed or restarting: {' '.join(unexpected)}"
       '')
     ];
   };
