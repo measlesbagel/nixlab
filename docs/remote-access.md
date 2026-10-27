@@ -1,12 +1,11 @@
 # Remote access and SSH
 
-How you reach the lab without Tailscale. Tailscale keeps running until all
-of this is set up and tested; it is removed in a later change.
+How you reach the lab and log in to it.
 
 - **Transport:** one WireGuard endpoint on seladonia (`services/wireguard.nix`)
   at `vpn.measlesbagel.dev`, UDP 51820. Peers are your own devices, listed in
   `homelab.wireguard.peers` (`modules/topology.nix`). Every peer is an admin
-  and reaches every port on every host, as on the tailnet.
+  and reaches every port on every host.
 - **Login:** OpenSSH with [opkssh](https://github.com/openpubkey/opkssh):
   `opkssh login` signs you in to Pocket ID (`id.measlesbagel.dev`, on
   seladonia) with your passkey and writes a 24-hour key to `~/.ssh`. Members
@@ -85,8 +84,8 @@ Do these in order; each step is safe to merge on its own.
    (`modules/lan.nix`); other LAN devices see seladonia's address.
 5. **syncoid.** albipes makes its own key on the next deploy. Commit
    `ssh deploy@192.168.4.41 cat /var/lib/syncoid/.ssh/id_ed25519.pub` as
-   `homelab.zfs.pullKey` in `modules/replication.nix`; replication then moves
-   from Tailscale SSH to the LAN.
+   `homelab.zfs.pullKey` in `modules/replication.nix`; replication starts on
+   the deploy after.
 6. **Host keys.** Commit each host's `/etc/ssh/ssh_host_ed25519_key.pub` as
    its `sshHostKey`, so hosts and deploys check it. `provision` prints it
    for new installs.

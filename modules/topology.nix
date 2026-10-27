@@ -62,12 +62,6 @@ in
         types.submodule {
           options = {
             ip = mkOption { type = types.str; };
-            tailscaleName = mkOption { type = types.str; };
-            tailscaleTags = mkOption {
-              type = types.listOf types.str;
-              default = [ ];
-              description = "ACL tags the node advertises; owned in tailscale/policy.hujson.";
-            };
             sshHostKey = mkOption {
               type = types.nullOr types.str;
               default = null;
@@ -102,8 +96,6 @@ in
   config.homelab.nodes = {
     seladonia = {
       ip = "192.168.4.39";
-      tailscaleName = "seladonia";
-      tailscaleTags = [ "tag:typhochlaena" ];
       bootstrapTarget = "root@192.168.4.39"; # Proxmox
       roles = [
         "edge"
@@ -112,8 +104,6 @@ in
     };
     albipes = {
       ip = "192.168.4.41";
-      tailscaleName = "albipes";
-      tailscaleTags = [ "tag:hapalotremus" ];
       bootstrapTarget = "root@192.168.4.41"; # UGOS, root SSH enabled for provisioning
       roles = [
         "storage"
@@ -123,15 +113,11 @@ in
     };
     chilense = {
       ip = "192.168.4.21";
-      tailscaleName = "chilense";
-      tailscaleTags = [ "tag:homoeomma" ];
       roles = [ "desktop" ];
     };
 
     leetzi = {
       ip = "192.168.4.51";
-      tailscaleName = "leetzi";
-      tailscaleTags = [ "tag:cyriocosmus" ];
       # DGX OS; root takes keys only, added via sparkrun's sudo.
       bootstrapTarget = "root@192.168.4.51";
       roles = [
@@ -141,8 +127,6 @@ in
     };
     elegans = {
       ip = "192.168.4.50";
-      tailscaleName = "elegans";
-      tailscaleTags = [ "tag:cyriocosmus" ];
       # DGX OS; root takes keys only, added via sparkrun's sudo.
       bootstrapTarget = "root@192.168.4.50";
       roles = [

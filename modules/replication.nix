@@ -1,5 +1,4 @@
-# Source side of albipes's syncoid pulls. Until pullKey is set they ride
-# Tailscale SSH, which the tailnet ACL allows; after, the LAN with this key.
+# Source side of albipes's syncoid pulls, over the LAN with albipes's own key.
 { config, lib, ... }:
 let
   inherit (lib) mkOption types;

@@ -18,8 +18,8 @@ Rules for AI/agent sessions in this repo.
 - No secret values in the repo, the Nix store, logs or CI artifacts. Ever.
 - Secrets are `op://` references to the `homelab` vault, rendered by OpNix
   with one read-only service account every host shares. Anything a
-  compromised host must not get (e.g. the Tailscale provisioning client)
-  stays out of `homelab`.
+  compromised host must not get (e.g. the break-glass SSH key) stays out of
+  `homelab`.
 - If a change seems to need a literal secret, stop: find the reference-based
   path or ask.
 - Planned: runtime secrets rendered by OpenBao `bao-agent` into
@@ -33,8 +33,9 @@ Rules for AI/agent sessions in this repo.
   which belongs in the commit message.
 - Public repo: IPs and hostnames are fine to commit; nothing else sensitive.
 - Hosts deploy themselves (comin); CI never reaches the lab or writes to the
-  cache. The break-glass push (`nix run .#deploy`) rides the tailnet to the
-  scoped `deploy` user, gated by Tailscale SSH ACLs. Root SSH stays off.
+  cache. The break-glass push (`nix run .#deploy`) goes over the LAN
+  to the scoped `deploy` user, through opkssh or the break-glass key
+  (docs/remote-access.md). Root SSH stays off.
 
 ## Validation
 
