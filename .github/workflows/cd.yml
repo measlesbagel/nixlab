@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cd
+  cancel-in-progress: true
+
 # Hosts deploy main themselves (modules/comin.nix); this only re-checks main
 # after a merge. It holds no credential that reaches the lab.
 jobs:
