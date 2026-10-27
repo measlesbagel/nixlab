@@ -55,5 +55,9 @@ in
     # A Spark compiles its NVIDIA kernel when Attic lacks it.
     buildTimeout = 7200;
     postDeploymentCommand = lib.getExe confirm;
+    # Only a tip commit GitHub made (web-UI merges, Dependabot) deploys, so a
+    # push from outside GitHub, even with stolen credentials, cannot. Key
+    # 968479A1AFF927E37D1A566BB5690EEEBB952194 from github.com/web-flow.gpg.
+    gpgPublicKeyPaths = [ "${./github-web-flow.asc}" ];
   };
 }
