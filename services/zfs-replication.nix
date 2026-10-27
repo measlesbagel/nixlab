@@ -64,6 +64,16 @@ in
     };
   };
 
+  # The first hourly pull starts it; the test cannot wait that long.
+  disko.tests.extraChecks = ''
+    with subtest("albipes makes the syncoid key whose public half is the sources' pullKey"):
+        machine.succeed(
+            "systemctl start ssh-keygen-syncoid.service",
+            "ssh-keygen -l -f ${sshKey}.pub",
+            '[ "$(stat -c %U:%a ${sshKey})" = syncoid:600 ]',
+        )
+  '';
+
   homelab.zfs.snapshots = lib.listToAttrs (map (r: lib.nameValuePair r.target "replica") replicas);
 
   homelab.reboot.blockers = [ "syncoid-*.service" ];

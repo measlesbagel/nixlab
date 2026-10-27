@@ -46,13 +46,33 @@ comin confirms only once the host passes `deploy-health` and can still reach
 GitHub. Hosts reboot into a new kernel by themselves at night, once idle
 (`modules/reboot.nix`).
 
-PRs run `ci.yml` (checks and a build of each changed host) and keep one
-comment with each changed host's closure diff against the base
+PRs run `ci.yml` (checks, a build of each changed host and a boot test of
+each changed x86_64 host) and keep one comment with each changed host's
+closure diff against the base
 ([nix-diff-action](https://github.com/natsukium/nix-diff-action), comparing
 `.drv` files, so nothing builds twice). The sizes in it are `.drv` closures,
 not runtime closures, and the action also uploads the full diff as a workflow
 artifact. A same-repo PR also pushes what it built to the Cachix cache.
 One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
+
+## Boot tests
+
+A host's boot test is disko's `installTest`. It formats scratch disks from
+the host's disko layout, installs the host's own system and bootloader,
+boots it under KVM, and runs the checks that its modules add to
+`disko.tests.extraChecks`. Any failed unit fails the test, except those in
+`homelab.vmTest.unverifiable`, which need what a VM lacks: 1Password secrets,
+the LAN, or USB and SMART hardware (`modules/vm-test.nix`). CI runs it for
+each changed host marked `vmTest` in `flake.nix`. To run one locally, on a
+machine with KVM:
+
+```console
+nix build .#nixosConfigurations.seladonia.config.system.build.installTest -L
+```
+
+The VM has 1 GiB of RAM and one vCPU, fixed by disko. It has no GPU, 10GbE
+uplink, hardware watchdog, secrets, LAN or internet, so none of those are
+tested. The Sparks have no boot test.
 
 ## Remote access
 

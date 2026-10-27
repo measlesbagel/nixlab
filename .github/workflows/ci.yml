@@ -86,10 +86,11 @@ jobs:
           echo "changed hosts: $hosts"
           # All aarch64 hosts build in one job. Today those are the two Sparks,
           # which share their whole NVIDIA kernel, so it compiles once.
+          # vmTests: the hosts the job also boots in a VM.
           builds=$(jq -c '
-            map(select(.system != "aarch64-linux") | {name: .host, system, hosts: .host})
+            map(select(.system != "aarch64-linux") | {name: .host, system, hosts: .host, vmTests: (if .vmTest then .host else "" end)})
             + (map(select(.system == "aarch64-linux"))
-               | if length > 0 then [{name: (map(.host) | join(", ")), system: "aarch64-linux", hosts: (map(.host) | join(" "))}] else [] end)
+               | if length > 0 then [{name: (map(.host) | join(", ")), system: "aarch64-linux", hosts: (map(.host) | join(" ")), vmTests: (map(select(.vmTest) | .host) | join(" "))}] else [] end)
           ' <<< "$hosts")
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
           # nix-diff-action reads its attributes input as YAML, which accepts JSON.
@@ -217,3 +218,17 @@ jobs:
             targets+=(".#nixosConfigurations.$host.config.system.build.toplevel")
           done
           nix build "${targets[@]}" --no-link --keep-going --print-build-logs "${opts[@]}"
+      # Installs each host from its disko layout and boots it under KVM, which
+      # nix-installer-action enables; the closure above is already local.
+      - name: Boot test
+        if: matrix.vmTests != ''
+        timeout-minutes: 30
+        env:
+          HOSTS: ${{ matrix.vmTests }}
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          targets=()
+          for host in "${hosts[@]}"; do
+            targets+=(".#nixosConfigurations.$host.config.system.build.installTest")
+          done
+          nix build "${targets[@]}" --no-link --keep-going --print-build-logs

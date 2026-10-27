@@ -48,5 +48,12 @@ in
         d: "/run/booted-system/sw/bin/zfs allow syncoid send,hold ${d}"
       ) datasets;
     };
+
+    disko.tests.extraChecks = ''
+      with subtest("syncoid may send and hold each replicated dataset"):
+          machine.wait_for_unit("zfs-replication-delegate.service")
+          for dataset in ${builtins.toJSON datasets}:
+              machine.succeed(f"zfs allow {dataset} | grep 'user syncoid hold,send'")
+    '';
   };
 }

@@ -58,12 +58,15 @@
           ./modules/ups.nix
           ./modules/cache.nix
           ./modules/comin.nix
+          ./modules/vm-test.nix
         ];
 
-        # `system` also picks the CI runner that builds the host.
+        # `system` also picks the CI runner that builds the host, and CI boots
+        # each `vmTest` host in a VM (modules/vm-test.nix).
         hosts = {
           seladonia = {
             system = "x86_64-linux";
+            vmTest = true;
             dir = ./hosts/seladonia;
             modules = [
               ./modules/zfs.nix
@@ -79,6 +82,7 @@
           };
           albipes = {
             system = "x86_64-linux";
+            vmTest = true;
             dir = ./hosts/albipes;
             modules = [
               ./modules/zfs.nix
@@ -91,6 +95,7 @@
           };
           chilense = {
             system = "x86_64-linux";
+            vmTest = true;
             dir = ./hosts/chilense;
             modules = [
               ./modules/zfs.nix
@@ -292,25 +297,39 @@
 
                 # Both sides through the same git fetcher, so identical trees
                 # give identical drvs.
-                drv() { nix eval --raw "git+file://$PWD?rev=$1#nixosConfigurations.$2.config.system.build.toplevel.drvPath"; }
+                drv() { nix eval --raw "git+file://$PWD?rev=$1#nixosConfigurations.$2.config.system.build" --apply "$3"; }
+
+                vmTests=" ${toString (lib.attrNames (lib.filterAttrs (_: spec: spec.vmTest or false) hosts))} "
 
                 changed=()
                 added=()
                 for host in ${lib.concatStringsSep " " (lib.attrNames hosts)}; do
-                  new=$(drv "$head" "$host")
-                  old=$(drv "$base" "$host" 2> /dev/null || echo none)
+                  # A vmTest host also changes when only its test does.
+                  builds="b: b.toplevel.drvPath"
+                  if [[ $vmTests == *" $host "* ]]; then
+                    builds+=" + b.installTest.drvPath"
+                  fi
+                  new=$(drv "$head" "$host" "$builds")
+                  old=$(drv "$base" "$host" "$builds" 2> /dev/null || echo none)
                   if [ "$new" != "$old" ]; then
                     changed+=("$host")
-                    if [ "$old" = none ]; then
+                    if [ "$old" = none ] && ! drv "$base" "$host" "b: b.toplevel.drvPath" > /dev/null 2>&1; then
                       added+=("$host")
                     fi
                   fi
                 done
 
-                # added: not evaluable on the base, so there is nothing to diff against.
-                jq -cn --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
+                # added: no base toplevel, so there is nothing to diff against.
+                jq -cn --argjson hosts '${
+                  builtins.toJSON (
+                    lib.mapAttrs (_: spec: {
+                      inherit (spec) system;
+                      vmTest = spec.vmTest or false;
+                    }) hosts
+                  )
+                }' \
                   --argjson added "$(printf '%s\n' "''${added[@]}" | jq -Rnc '[inputs | select(. != "")]')" \
-                  '$ARGS.positional | map({host: ., system: $systems[.], added: (. as $h | $added | index($h) != null)})' --args "''${changed[@]}"
+                  '$ARGS.positional | map({host: ., added: (. as $h | $added | index($h) != null)} + $hosts[.])' --args "''${changed[@]}"
               '';
             };
 
