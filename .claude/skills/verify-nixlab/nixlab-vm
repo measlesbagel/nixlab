@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+# SC2016: VM commands are meant to expand in the VM. SC2154: run.env sets the rest.
+# shellcheck disable=SC2016,SC2154
+# Drive a host's config as a disposable VM over its serial console (vm.nix).
+#
+#   nixlab-vm launch [host]            build, boot, log in; prints NIXLAB_VM_RUN
+#   nixlab-vm doctor                   is this run's VM worth driving?
+#   nixlab-vm exec [--] <shell cmd>    run as root in the VM; stdout + exit code
+#   nixlab-vm host [--] <cmd...>       run on this machine, recorded the same way
+#   nixlab-vm teardown                 stop the VM; evidence stays
+#
+# Every command but launch acts on the run named by NIXLAB_VM_RUN.
+set -euo pipefail
+
+skill=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo=$(git -C "$skill" rev-parse --show-toplevel)
+verify="$repo/.verify"
+
+# tmux from the flake's own nixpkgs when the machine has none, on its own
+# server so it never touches the user's sessions.
+tmux() {
+  if [ -z "${tmux_bin:-}" ]; then
+    tmux_bin=$(type -P tmux || echo "$(nix build --no-link --print-out-paths --inputs-from "$repo" "nixpkgs#tmux^out")/bin/tmux")
+  fi
+  "$tmux_bin" -L nixlab-vm "$@"
+}
+
+die() {
+  echo "nixlab-vm: $*" >&2
+  exit 1
+}
+
+run_dirs() {
+  [ -n "${NIXLAB_VM_RUN:-}" ] || die "NIXLAB_VM_RUN is unset; use the value launch printed"
+  evidence="$verify/$NIXLAB_VM_RUN"
+  [ -f "$evidence/run.env" ] || die "no run $NIXLAB_VM_RUN under $verify"
+  # shellcheck source=/dev/null
+  . "$evidence/run.env"
+}
+
+# Console output so far, without carriage returns or terminal escapes.
+console() {
+  tr -d '\r' < "$evidence/console.log" \
+    | sed -E $'s/\x1b\\][^\x07\x1b]*(\x07|\x1b\\\\)//g; s/\x1b\\[[0-9;:?]*[a-zA-Z]//g; s/\x1b[78=>]//g'
+}
+
+wait_for() {
+  local pattern=$1 timeout=$2
+  for _ in $(seq "$timeout"); do
+    console | grep -qE "$pattern" && return 0
+    tmux has-session -t "$session" 2> /dev/null || die "VM exited; see $evidence/console.log"
+    sleep 1
+  done
+  die "timed out after ${timeout}s waiting for /$pattern/; see $evidence/console.log"
+}
+
+type_line() { tmux send-keys -t "$session" -l "$1" && tmux send-keys -t "$session" Enter; }
+
+launch() {
+  local host=${1:-seladonia}
+  [ -w /dev/kvm ] || die "/dev/kvm is not writable; the VM would crawl under TCG"
+
+  NIXLAB_VM_RUN="$host-$(date +%Y%m%d-%H%M%S)-$$"
+  evidence="$verify/$NIXLAB_VM_RUN"
+  runtime="${XDG_RUNTIME_DIR:-/tmp}/nixlab-vm/$NIXLAB_VM_RUN"
+  session="nixlab-vm-$NIXLAB_VM_RUN"
+  mkdir -p "$evidence" "$runtime"
+
+  echo ">> building $host VM (first build compiles a ZFS kernel; can take a while)" >&2
+  local vm toplevel
+  vm=$(nix build --impure --no-link --print-out-paths --file "$skill/vm.nix" \
+    --argstr flake "$repo" --argstr host "$host")
+  toplevel=$(nix build --impure --no-link --print-out-paths --file "$skill/vm.nix" \
+    --argstr flake "$repo" --argstr host "$host" toplevel)
+
+  cat > "$evidence/run.env" << EOF
+host=$host
+session=$session
+runtime=$runtime
+toplevel=$toplevel
+rev=$(git -C "$repo" rev-parse HEAD)$(git -C "$repo" diff --quiet HEAD || echo -dirty)
+EOF
+  : > "$evidence/console.log"
+  : > "$evidence/transcript.md"
+
+  # disko-vm's scratch disks go to TMPDIR and the EFI vars to the cwd; keep
+  # both in the runtime dir that teardown removes.
+  tmux new-session -d -s "$session" -x 250 -y 50 -c "$runtime" \
+    "TMPDIR='$runtime' NIX_EFI_VARS='$runtime/efi-vars.fd' exec '$vm/bin/disko-vm'"
+  tmux pipe-pane -t "$session" -o "cat >> '$evidence/console.log'"
+
+  echo ">> booting; console log: $evidence/console.log" >&2
+  wait_for "$host login:" 300
+  type_line root
+  wait_for "Password:" 30
+  type_line vm
+  wait_for "root@$host:~\]#" 60
+  # Kernel messages would interleave with command output on the console.
+  type_line "set +o emacs +o vi; export SYSTEMD_COLORS=0 SYSTEMD_PAGER=cat; dmesg -n 1; stty -echo cols 250; PS1='\\n'; echo nixlab-vm-ready"
+  wait_for "^nixlab-vm-ready" 30
+
+  echo "export NIXLAB_VM_RUN=$NIXLAB_VM_RUN"
+}
+
+vm_exec() {
+  run_dirs
+  [ "${1:-}" = "--" ] && shift
+  local cmd="$*" id begin end out
+  [ -n "$cmd" ] || die "exec needs a command"
+  tmux has-session -t "$session" 2> /dev/null || die "VM for $NIXLAB_VM_RUN is not running"
+  id=$(date +%s%N)
+  begin="__NXB_$id"
+  end="__NXE_$id"
+  # Base64 keeps quoting intact and stops the markers from appearing in the
+  # typed line; printf splits them for the same reason.
+  type_line "printf '%s_%s\\n' __NXB $id; echo $(printf '%s' "$cmd" | base64 -w0) | base64 -d > /tmp/nx.sh; bash /tmp/nx.sh 2>&1; printf '%s_%s %s\\n' __NXE $id \$?"
+  if ! (wait_for "^$end " "${NIXLAB_VM_TIMEOUT:-120}"); then
+    # Free the console for the next exec.
+    tmux send-keys -t "$session" C-c
+    record "vm" "$cmd" "(timed out; sent Ctrl-C)" "timeout"
+    die "timed out after ${NIXLAB_VM_TIMEOUT:-120}s; sent Ctrl-C to free the console"
+  fi
+  out=$(console | awk -v b="$begin" -v e="$end" '$0 == b {on = 1; next} index($0, e " ") == 1 {print "#exit " $2; exit} on')
+  local code=${out##*#exit }
+  out=${out%#exit *}
+  printf '%s' "$out"
+  record "vm" "$cmd" "$out" "$code"
+  return "$code"
+}
+
+host_exec() {
+  run_dirs
+  [ "${1:-}" = "--" ] && shift
+  local out code=0
+  out=$(cd "$repo" && "$@" 2>&1) || code=$?
+  printf '%s\n' "$out"
+  record "host" "$*" "$out" "$code"
+  return "$code"
+}
+
+record() {
+  {
+    printf '### %s %s\n\n```console\n$ %s\n%s\n```\nexit %s\n\n' \
+      "$1" "$(date -Is)" "$2" "${3%$'\n'}" "$4"
+  } >> "$evidence/transcript.md"
+}
+
+doctor() {
+  run_dirs
+  local ok=1 pane qemu
+  if pane=$(tmux display-message -p -t "$session" '#{pane_pid}' 2> /dev/null); then
+    qemu=$(pgrep -P "$pane" -f qemu || pgrep -f "qemu.*$runtime" || true)
+    echo "tmux session $session: up (pane pid $pane, qemu ${qemu:-?})"
+  else
+    echo "tmux session $session: MISSING"
+    ok=0
+  fi
+  if [ "$ok" = 1 ]; then
+    local facts
+    facts=$(vm_exec 'echo "virt=$(systemd-detect-virt) host=$(hostname) system=$(readlink -f /run/current-system) state=$(systemctl is-system-running)"' || true)
+    # The VM must not reach the real lab or the internet.
+    local net
+    net=$(vm_exec 'for t in 192.168.4.39:22 192.168.4.41:22 140.82.112.3:443; do timeout 3 bash -c "</dev/tcp/${t%:*}/${t#*:}" 2>/dev/null && echo "reachable $t"; done; true')
+    if [ -n "$net" ]; then
+      echo "network NOT restricted: $net"
+      ok=0
+    else
+      echo "network: LAN and internet unreachable"
+    fi
+    echo "$facts"
+    case "$facts" in *virt=kvm* | *virt=qemu*) ;; *)
+      echo "not a VM: refusing"
+      ok=0
+      ;;
+    esac
+    [[ "$facts" == *"host=$host "* ]] || {
+      echo "hostname is not $host"
+      ok=0
+    }
+    [[ "$facts" == *"system=$toplevel "* ]] || {
+      echo "running system is not this run's build ($toplevel)"
+      ok=0
+    }
+  fi
+  echo "build: $toplevel at $rev"
+  if [ "$ok" = 1 ]; then
+    echo "doctor: OK"
+  else
+    echo "doctor: FAIL"
+    return 1
+  fi
+}
+
+teardown() {
+  run_dirs
+  local pane
+  if pane=$(tmux display-message -p -t "$session" '#{pane_pid}' 2> /dev/null); then
+    pkill -TERM -P "$pane" 2> /dev/null || true
+    kill -TERM "$pane" 2> /dev/null || true
+    for _ in $(seq 10); do kill -0 "$pane" 2> /dev/null || break; sleep 1; done
+    tmux kill-session -t "$session" 2> /dev/null || true
+  fi
+  rm -rf "$runtime"
+  echo "stopped $NIXLAB_VM_RUN; evidence kept in $evidence"
+}
+
+case "${1:-}" in
+  launch) shift && launch "$@" ;;
+  doctor) doctor ;;
+  exec) shift && vm_exec "$@" ;;
+  host) shift && host_exec "$@" ;;
+  teardown) teardown ;;
+  *) sed -n '4,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2 && exit 2 ;;
+esac
