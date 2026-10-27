@@ -10,13 +10,13 @@ through the weekly flake.lock PR, to this repository.
 1. Create `measlesbagel/nixlab`, public, with pull requests restricted to
    collaborators (Settings > General > Features; UI only).
 2. Actions: only GitHub-owned actions plus `DeterminateSystems/*`,
-   `gitleaks/*`, `zizmorcore/*`, `cachix/cachix-action@*`, and the actions
-   `update-flake-lock` calls, which the list also gates:
-   `peter-evans/create-pull-request@*`, `DamianReeves/write-file-action@*`,
-   `pedrolamas/handlebars-action@*`, `juliangruber/read-file-action@*` and
-   `crazy-max/ghaction-import-gpg@*` (it pins them by SHA). SHA pinning required;
-   approval for every outside contributor's run; a read-only default token
-   that cannot approve PRs.
+   `gitleaks/*`, `natsukium/nix-diff-action@*`, `zizmorcore/*`,
+   `cachix/cachix-action@*`, and the actions `update-flake-lock` calls, which
+   the list also gates: `peter-evans/create-pull-request@*`,
+   `DamianReeves/write-file-action@*`, `pedrolamas/handlebars-action@*`,
+   `juliangruber/read-file-action@*` and `crazy-max/ghaction-import-gpg@*` (it
+   pins them by SHA). SHA pinning required; approval for every outside
+   contributor's run; a read-only default token that cannot approve PRs.
 3. Ruleset `main`: require a pull request with code-owner review and the
    `Secret scan`, `Workflow lint`, `Flake check`, `Commit format` and
    `Flake lock` status checks; block force pushes and deletion; repository
