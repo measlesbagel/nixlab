@@ -19,6 +19,14 @@ in
               default = [ ];
               description = "ACL tags the node advertises; owned in tailscale/policy.hujson.";
             };
+            sshHostKey = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+              description = ''
+                The host's `/etc/ssh/ssh_host_ed25519_key.pub` line, once it
+                is provisioned. Public by design.
+              '';
+            };
             bootstrapTarget = mkOption {
               type = types.nullOr types.str;
               default = null;

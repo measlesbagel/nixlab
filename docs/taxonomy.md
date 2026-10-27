@@ -15,7 +15,6 @@ Tags that are not hosts take life-cycle stages:
 
 | Tag | Stage | Holder |
 | --- | --- | --- |
-| `tag:hatch` | emerging from the egg sac | CI runners |
 | `tag:instar` | the stage between molts | the kexec installer |
 | `tag:molt` | shedding the old exoskeleton | the provisioning client, which turns an old OS into NixOS |
 

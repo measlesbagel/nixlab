@@ -5,8 +5,9 @@ Rules for AI/agent sessions in this repo.
 ## Ownership
 
 - This repo is the only source of truth for the homelab. `main` is authored
-  source: hosts are provisioned with `nixos-anywhere` and deployed with
-  colmena. There is no rendered branch and no second desired state.
+  source: hosts are provisioned with `nixos-anywhere` and pull `main`
+  themselves with comin. There is no rendered branch and no second desired
+  state.
 - One owner per concern: inventory lives only in `modules/topology.nix`; a
   `services/<name>.nix` owns its service, firewall, routes, backups and
   monitoring wiring.
@@ -31,8 +32,9 @@ Rules for AI/agent sessions in this repo.
   other files). Keep them short; never restate the code or narrate history,
   which belongs in the commit message.
 - Public repo: IPs and hostnames are fine to commit; nothing else sensitive.
-- Deploys ride the tailnet to the scoped `deploy` user, gated by Tailscale
-  SSH ACLs. Root SSH stays off.
+- Hosts deploy themselves (comin); CI never reaches the lab or writes to the
+  cache. The break-glass push (`nix run .#deploy`) rides the tailnet to the
+  scoped `deploy` user, gated by Tailscale SSH ACLs. Root SSH stays off.
 
 ## Validation
 
@@ -48,7 +50,8 @@ nix flake check
 
 ## Completion
 
-Work lands as a PR, and merging to `main` deploys the changed hosts. The PR
+Work lands as a PR, and merging to `main` deploys every changed host with no
+further gate. The PR
 description names the hosts and services changed, any secret references
 added (never values; the 1Password items must exist before merge), and
 rollback implications.
