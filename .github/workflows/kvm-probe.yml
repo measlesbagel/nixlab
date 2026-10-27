@@ -1,0 +1,31 @@
+name: kvm-probe
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: KVM on ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - run: |
+          uname -m
+          ls -l /dev/kvm || true
+          grep -Ec '(vmx|svm)' /proc/cpuinfo || true
+          lscpu | grep -iE 'virtuali|hypervisor|model name' || true
+          sudo dmesg | grep -iE 'kvm|hyp' | tail -5 || true
+          sudo modprobe kvm 2>&1 || true
+          ls /sys/module | grep -i kvm || true
+          if [ -c /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            python3 -c 'import fcntl,os; fd=os.open("/dev/kvm",os.O_RDWR); print("KVM_GET_API_VERSION", fcntl.ioctl(fd, 0xAE00))'
+          else
+            echo "NO /dev/kvm"
+          fi
