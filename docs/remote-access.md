@@ -22,9 +22,18 @@ How you reach the lab and log in to it.
 
 | User | From | Hosts |
 | --- | --- | --- |
-| `measles`, `deploy` | WireGuard peers, chilense | all |
-| `syncoid` | albipes | seladonia, chilense |
+| `measles`, `deploy` | WireGuard peers, *Homoeomma* (chilense) | all |
+| `syncoid` | *Hapalotremus* (albipes) | seladonia, chilense |
 | `nix-builder` | leetzi, on the Spark link | elegans |
+
+Logins name their sources by host, genus ([taxonomy.md](taxonomy.md)) or
+address, e.g. `homelab.ssh.logins.syncoid = [ "hapalotremus" ]`; sshd and
+nftables get the addresses from topology. Each port 22 rule carries the
+names as its comment.
+
+Hosts answer as `<name>` and `<name>.lab.measlesbagel.dev`: through
+`/etc/hosts` on the lab hosts, and through a resolver on seladonia
+(`services/dns.nix`) for WireGuard peers.
 
 ## One-time setup
 
@@ -33,7 +42,7 @@ Do these in order; each step is safe to merge on its own.
 1. **Break-glass key.** Create an SSH key in 1Password (e.g. `nixlab
    break-glass` in `private`), and commit its public key as
    `homelab.breakGlassKey` in `modules/topology.nix`. After the deploy,
-   `ssh deploy@192.168.4.39` from chilense works with the 1Password agent.
+   `ssh deploy@seladonia` from chilense works with the 1Password agent.
 2. **Pocket ID.** Create `op://homelab/pocket-id/encryption-key` (e.g.
    `openssl rand -base64 32`) before the deploy that adds Pocket ID. Then, on
    the LAN:
@@ -50,7 +59,7 @@ Do these in order; each step is safe to merge on its own.
 
    ```console
    opkssh login --provider "https://id.measlesbagel.dev,<client-id>,,openid profile email groups"
-   ssh deploy@192.168.4.39
+   ssh deploy@seladonia
    ```
 
    `opkssh login --create-config` writes `~/.opk/config.yml`, where you can
@@ -73,6 +82,7 @@ Do these in order; each step is safe to merge on its own.
    [Interface]
    PrivateKey = <made on the device>
    Address = 10.100.0.2/32
+   DNS = 10.100.0.1, lab.measlesbagel.dev
 
    [Peer]
    PublicKey = <homelab.wireguard.publicKey>
@@ -83,7 +93,7 @@ Do these in order; each step is safe to merge on its own.
    Lab hosts route `10.100.0.0/24` back through seladonia themselves
    (`modules/lan.nix`); other LAN devices see seladonia's address.
 5. **syncoid.** albipes makes its own key on the next deploy. Commit
-   `ssh deploy@192.168.4.41 cat /var/lib/syncoid/.ssh/id_ed25519.pub` as
+   `ssh deploy@albipes cat /var/lib/syncoid/.ssh/id_ed25519.pub` as
    `homelab.zfs.pullKey` in `modules/replication.nix`; replication starts on
    the deploy after.
 6. **Host keys.** Commit each host's `/etc/ssh/ssh_host_ed25519_key.pub` as

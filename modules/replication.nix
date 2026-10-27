@@ -33,7 +33,7 @@ in
     };
     users.groups.syncoid = { };
 
-    homelab.ssh.logins.syncoid = [ albipes ];
+    homelab.ssh.logins.syncoid = [ "hapalotremus" ];
 
     # --no-sync-snap pulls need only send and hold.
     systemd.services.zfs-replication-delegate = {

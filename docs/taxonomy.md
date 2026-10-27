@@ -1,7 +1,12 @@
 # Taxonomy
 
 Hosts are named binomially after dwarf tarantulas (Theraphosidae). The genus
-is the role; the specific epithet is the hostname.
+is the role, and the host's `genus` in `modules/topology.nix`; the specific
+epithet is the hostname.
+
+A genus is also a host group: `colmena apply --on @cyriocosmus` deploys both
+Sparks, and SSH login rules and their tests name sources by genus
+(`homelab.ssh.logins`, `tests/access-policy.nix`).
 
 | Role | Genus | Species (host) | Why |
 | --- | --- | --- | --- |

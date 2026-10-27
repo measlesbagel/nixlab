@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (config.homelab) wireguard nodes;
+  inherit (config.homelab) lan wireguard nodes;
 in
 {
   options.homelab.lan.uplinkDrivers = lib.mkOption {
@@ -32,6 +32,14 @@ in
         }
       ) config.homelab.lan.uplinkDrivers
     );
+
+    networking.hosts = lib.mapAttrs' (
+      name: node:
+      lib.nameValuePair node.ip [
+        name
+        "${name}.${lan.domain}"
+      ]
+    ) nodes;
 
     # Replies to WireGuard peers go back through the endpoint, not the router,
     # so the firewall can tell a peer's address from the endpoint's.
