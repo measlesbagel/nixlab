@@ -19,6 +19,12 @@ in
       type = types.port;
       default = 7313;
     };
+    publicUrl = mkOption {
+      type = types.str;
+      readOnly = true;
+      default = "https://cache.${config.homelab.domain}/${cfg.name}";
+      description = "Read-only route for CI (services/attic-public.nix).";
+    };
     publicKey = mkOption {
       type = types.nullOr types.str;
       # Set once albipes has first booted (docs/ci-setup.md); until then

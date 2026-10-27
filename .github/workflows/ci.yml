@@ -71,7 +71,7 @@ jobs:
           echo "hosts=$hosts" >> "$GITHUB_OUTPUT"
           echo "changed hosts: $hosts"
 
-  # No secrets and no lab access.
+  # No secrets; the lab cache only through its public read-only route.
   build:
     name: Build ${{ matrix.host }}
     needs: changed
@@ -88,7 +88,19 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      # Reads what the hosts already built through the public read-only route
+      # (services/attic-public.nix); skipped until the cache key is committed.
       - name: Build closure
         env:
           HOST: ${{ matrix.host }}
-        run: nix build ".#nixosConfigurations.$HOST.config.system.build.toplevel" --no-link --print-build-logs
+        run: |
+          cache=$(nix eval --json ".#nixosConfigurations.$HOST.config.homelab.cache" \
+            --apply 'c: { inherit (c) publicUrl publicKey; }')
+          key=$(jq -r '.publicKey // empty' <<< "$cache")
+          opts=()
+          if [ -n "$key" ]; then
+            opts=(--option extra-substituters "$(jq -r .publicUrl <<< "$cache")"
+              --option extra-trusted-public-keys "$key"
+              --option connect-timeout 5)
+          fi
+          nix build ".#nixosConfigurations.$HOST.config.system.build.toplevel" --no-link --print-build-logs "${opts[@]}"

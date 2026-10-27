@@ -61,7 +61,13 @@ Commit the printed public key as `homelab.cache.publicKey`, at its default in
 pull from nor push to the cache.
 
 The cache is public for reads, which is safe because nothing secret is ever in
-the Nix store. It is reachable only on the LAN.
+the Nix store. Hosts use it on the LAN. CI reads it through
+`https://cache.measlesbagel.dev/nixlab` (`services/attic-public.nix`): Caddy
+on seladonia passes only `GET` and `HEAD` under `/nixlab/` and drops any
+`Authorization` header, so the token API stays LAN-only. A PR that changes
+nothing under the Spark kernel then downloads it instead of rebuilding it for
+two hours; a kernel change still builds in full, because CI runs before any
+host has built it. Each CI download counts against the home uplink.
 
 ## Remote builder (leetzi → elegans)
 
