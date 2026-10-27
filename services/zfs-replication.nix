@@ -1,5 +1,4 @@
 {
-  config,
   inputs,
   lib,
   pkgs,
@@ -32,7 +31,7 @@ in
       map (
         r:
         lib.nameValuePair "${r.host}-${baseNameOf r.dataset}" {
-          source = "syncoid@${config.homelab.nodes.${r.host}.ip}:${r.dataset}";
+          source = "syncoid@${r.host}:${r.dataset}";
           inherit (r) target;
           recvOptions = "u";
           service = {

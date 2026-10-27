@@ -17,8 +17,14 @@ let
     ;
 
   hosts = lib.attrNames nixosConfigurations;
-  inherit (nixosConfigurations.seladonia.config.homelab) nodes;
-  ip = host: nodes.${host}.ip;
+  inherit (nixosConfigurations.seladonia.config.homelab) nodes addressesOf;
+  # A host name or a genus.
+  hostsOf =
+    dst:
+    if nodes ? ${dst} then
+      [ dst ]
+    else
+      lib.attrNames (lib.filterAttrs (_: node: node.genus == dst) nodes);
 
   toNumber = address: lib.foldl (acc: octet: acc * 256 + toInt octet) 0 (splitString "." address);
   inCidr =
@@ -47,6 +53,8 @@ let
     "root"
   ];
 
+  # Sources and destinations are hosts, genera (docs/taxonomy.md) or, for
+  # sources, addresses.
   cases = [
     {
       # A WireGuard peer.
@@ -62,7 +70,7 @@ let
       ];
     }
     {
-      source = ip "chilense";
+      source = "homoeomma";
       dst = hosts;
       accept = [
         "measles"
@@ -74,10 +82,10 @@ let
       ];
     }
     {
-      source = ip "albipes";
+      source = "hapalotremus";
       dst = [
-        "seladonia"
-        "chilense"
+        "typhochlaena"
+        "homoeomma"
       ];
       accept = [ "syncoid" ];
       deny = [
@@ -87,11 +95,8 @@ let
       ];
     }
     {
-      source = ip "albipes";
-      dst = [
-        "leetzi"
-        "elegans"
-      ];
+      source = "hapalotremus";
+      dst = [ "cyriocosmus" ];
       deny = everyone;
     }
     {
@@ -103,12 +108,12 @@ let
     }
     {
       # Includes WireGuard traffic the endpoint masquerades.
-      source = ip "seladonia";
+      source = "typhochlaena";
       dst = hosts;
       deny = everyone;
     }
     {
-      source = ip "leetzi";
+      source = "cyriocosmus";
       dst = hosts;
       deny = everyone;
     }
@@ -124,13 +129,16 @@ let
     c:
     concatMap (
       host:
-      map (user: "${user}@${host} from ${c.source}: should be accepted") (
-        filter (user: !allowed host user c.source) (c.accept or [ ])
-      )
-      ++ map (user: "${user}@${host} from ${c.source}: should be denied") (
-        filter (user: allowed host user c.source) (c.deny or [ ])
-      )
-    ) c.dst
+      concatMap (
+        address:
+        map (user: "${user}@${host} from ${c.source} (${address}): should be accepted") (
+          filter (user: !allowed host user address) (c.accept or [ ])
+        )
+        ++ map (user: "${user}@${host} from ${c.source} (${address}): should be denied") (
+          filter (user: allowed host user address) (c.deny or [ ])
+        )
+      ) (addressesOf c.source)
+    ) (concatMap hostsOf c.dst)
   ) cases;
 in
 assert lib.assertMsg (failures == [ ]) (lib.concatLines failures);

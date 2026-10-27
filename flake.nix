@@ -71,6 +71,7 @@
               ./services/ddns.nix
               ./services/pocket-id.nix
               ./services/wireguard.nix
+              ./services/dns.nix
               ./services/postgresql.nix
               ./services/navidrome.nix
               ./services/model-sync.nix
@@ -136,13 +137,12 @@
           ]
           ++ spec.modules;
 
-        inherit ((lib.evalModules { modules = [ ./modules/topology.nix ]; }).config.homelab) nodes;
+        inherit ((lib.evalModules { modules = [ ./modules/topology.nix ]; }).config.homelab) nodes lan;
 
         # Pinned keys are checked; a host with none yet is trusted on first use.
         knownHosts = builtins.toFile "nixlab-known-hosts" (
           lib.concatStrings (
-            lib.mapAttrsToList (name: node: "${name},${node.ip} ${node.sshHostKey}
-") (
+            lib.mapAttrsToList (name: node: "${name},${name}.${lan.domain},${node.ip} ${node.sshHostKey}\n") (
               lib.filterAttrs (_: node: node.sshHostKey != null) nodes
             )
           )
@@ -169,10 +169,15 @@
             // lib.mapAttrs (name: spec: {
               deployment = {
                 targetUser = "deploy";
-                tags = [ "homelab" ];
+                tags = [
+                  "homelab"
+                  nodes.${name}.genus
+                ];
                 # As comin does: the host builds, pulling what it can from Attic.
                 buildOnTarget = true;
-                targetHost = nodes.${name}.ip;
+                # Resolved by /etc/hosts (modules/lan.nix) or, over WireGuard,
+                # services/dns.nix.
+                targetHost = "${name}.${lan.domain}";
                 sshOptions = [
                   "-o"
                   "UserKnownHostsFile=~/.ssh/known_hosts ${knownHosts}"
