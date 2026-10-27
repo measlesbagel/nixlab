@@ -45,8 +45,8 @@ Rules for AI/agent sessions in this repo.
 ## Validation
 
 CI is the check of record: every PR runs the secret scan, workflow lint,
-`nix fmt -- --ci`, `nix flake check` and a build of each changed host on its
-own architecture. Before pushing, run the two that are quick and that CI
+`nix fmt -- --ci`, `nix flake check`, flake-checker on `flake.lock` and a
+build of each changed host on its own architecture. Before pushing, run the two that are quick and that CI
 cannot fix for you:
 
 ```console
