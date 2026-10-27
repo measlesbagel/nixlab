@@ -68,6 +68,7 @@ in
       # Clients send derivations, which only trusted users may build.
       nix.settings.trusted-users = [ user ];
       networking.firewall.interfaces.${cfg.serveTo.interface}.allowedTCPPorts = [ 22 ];
+      homelab.ssh.logins.${user} = lib.attrValues cfg.serveTo.clients;
     })
 
     (lib.mkIf (cfg.remote != null && nodes.${cfg.remote.host}.sshHostKey != null) {

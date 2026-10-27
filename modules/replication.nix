@@ -1,15 +1,25 @@
-# Source side of albipes's pulls over Tailscale SSH; the tailnet ACL must
-# allow albipes -> syncoid@<host>.
+# Source side of albipes's syncoid pulls. Until pullKey is set they ride
+# Tailscale SSH, which the tailnet ACL allows; after, the LAN with this key.
 { config, lib, ... }:
 let
   inherit (lib) mkOption types;
+  inherit (config.homelab.zfs) pullKey;
   datasets = config.homelab.zfs.replicate;
+  albipes = config.homelab.nodes.albipes.ip;
 in
 {
-  options.homelab.zfs.replicate = mkOption {
-    type = types.listOf types.str;
-    default = [ ];
-    description = "Datasets pulled by albipes; keep secrets out of these.";
+  options.homelab.zfs = {
+    replicate = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      description = "Datasets pulled by albipes; keep secrets out of these.";
+    };
+    pullKey = mkOption {
+      type = types.nullOr types.str;
+      # Set once albipes has made it (docs/remote-access.md).
+      default = null;
+      description = "albipes's syncoid public key, /var/lib/syncoid/.ssh/id_ed25519.pub.";
+    };
   };
 
   config = lib.mkIf (datasets != [ ]) {
@@ -18,8 +28,13 @@ in
       group = "syncoid";
       home = "/var/lib/syncoid";
       useDefaultShell = true;
+      openssh.authorizedKeys.keys = lib.optional (
+        pullKey != null
+      ) ''from="${albipes}",restrict ${pullKey}'';
     };
     users.groups.syncoid = { };
+
+    homelab.ssh.logins.syncoid = [ albipes ];
 
     # --no-sync-snap pulls need only send and hold.
     systemd.services.zfs-replication-delegate = {

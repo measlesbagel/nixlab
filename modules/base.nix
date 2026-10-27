@@ -27,7 +27,8 @@
 
   networking.useDHCP = lib.mkDefault true;
 
-  # Reachable over tailscale0 only (trusted interface); LAN port 22 stays shut.
+  # Who may log in, and from where, is modules/ssh.nix; LAN port 22 stays shut
+  # to everything else.
   services.openssh = {
     enable = true;
     openFirewall = false;
@@ -37,8 +38,8 @@
     };
   };
 
-  # Reached only through Tailscale SSH (tailscale/policy.hujson), so neither
-  # carries authorized keys.
+  # Logins are opkssh or the break-glass key (modules/ssh.nix), plus Tailscale
+  # SSH until it is removed.
   users.users = {
     measles = {
       isNormalUser = true;

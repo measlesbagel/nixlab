@@ -49,6 +49,7 @@
           ./modules/base.nix
           ./modules/lan.nix
           ./modules/tailscale.nix
+          ./modules/ssh.nix
           ./modules/opnix.nix
           ./modules/backup.nix
           ./modules/snapshots.nix
@@ -69,6 +70,8 @@
               ./modules/zfs.nix
               ./services/caddy.nix
               ./services/ddns.nix
+              ./services/pocket-id.nix
+              ./services/wireguard.nix
               ./services/postgresql.nix
               ./services/navidrome.nix
               ./services/model-sync.nix
@@ -204,6 +207,13 @@
               {
                 statix = lint "statix" pkgs.statix "statix check .";
                 deadnix = lint "deadnix" pkgs.deadnix "deadnix --fail .";
+              }
+              # Evaluates every host, so once is enough.
+              // lib.optionalAttrs (system == "x86_64-linux") {
+                access-policy = import ./tests/access-policy.nix {
+                  inherit lib pkgs;
+                  inherit (inputs.self) nixosConfigurations;
+                };
               };
 
             packages.kexec-installer =
@@ -222,9 +232,6 @@
                 pkgs.openssh
                 pkgs.curl
                 pkgs.jq
-                pkgs.cpio
-                pkgs.gzip
-                pkgs.gnutar
               ];
               # `op` comes from the host, for 1Password's desktop integration.
               text =
@@ -235,6 +242,7 @@
                       lib.mapAttrs (name: spec: {
                         inherit (spec) system;
                         inherit (inputs.self.nixosConfigurations.${name}.config.homelab.nodes.${name})
+                          ip
                           tailscaleName
                           tailscaleTags
                           bootstrapTarget
