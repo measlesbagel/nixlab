@@ -10,13 +10,15 @@ let
     breakGlassKey
     wireguard
     nodes
+    addressesOf
     ;
   cfg = config.homelab.ssh;
   issuer = "https://id.${domain}";
   admins = [
     wireguard.subnet
-    nodes.chilense.ip
+    "homoeomma"
   ];
+  addresses = sources: lib.unique (lib.concatMap addressesOf sources);
   people = [
     "measles"
     "deploy"
@@ -27,7 +29,7 @@ in
     logins = mkOption {
       type = types.attrsOf (types.listOf types.str);
       default = { };
-      description = "Users sshd lets in, by the addresses or CIDRs they may come from.";
+      description = "Users sshd lets in, by the hosts, genera, addresses or CIDRs they may come from.";
     };
     pocketId = {
       clientId = mkOption {
@@ -50,7 +52,9 @@ in
     homelab.ssh.logins = lib.genAttrs people (_: admins);
 
     services.openssh.settings.AllowUsers = lib.concatLists (
-      lib.mapAttrsToList (user: map (source: "${user}@${source}")) cfg.logins
+      lib.mapAttrsToList (
+        user: sources: map (address: "${user}@${address}") (addresses sources)
+      ) cfg.logins
     );
 
     services.opkssh = lib.mkIf (cfg.pocketId.clientId != null) {
@@ -79,6 +83,7 @@ in
     programs.ssh.knownHosts = lib.mapAttrs (name: node: {
       hostNames = [
         name
+        "${name}.${lan.domain}"
         node.ip
       ];
       publicKey = node.sshHostKey;
@@ -88,7 +93,12 @@ in
     networking.nftables.enable = true;
     networking.firewall.extraInputRules = ''
       ip saddr ${wireguard.subnet} accept
-      ip saddr { ${lib.concatStringsSep ", " (lib.unique (lib.concatLists (lib.attrValues cfg.logins)))} } tcp dport 22 accept
-    '';
+    ''
+    + lib.concatLines (
+      lib.mapAttrsToList (
+        user: sources:
+        ''ip saddr { ${lib.concatStringsSep ", " (addresses sources)} } tcp dport 22 accept comment "${user} from ${lib.concatStringsSep ", " sources}"''
+      ) cfg.logins
+    );
   };
 }

@@ -1,9 +1,24 @@
-{ lib, ... }:
+{ config, lib, ... }:
 let
   inherit (lib) mkOption types;
+  inherit (config.homelab) nodes;
 in
 {
   options.homelab = {
+    addressesOf = mkOption {
+      type = types.functionTo (types.listOf types.str);
+      readOnly = true;
+      default =
+        source:
+        if nodes ? ${source} then
+          [ nodes.${source}.ip ]
+        else
+          let
+            members = lib.filterAttrs (_: node: node.genus == source) nodes;
+          in
+          if members != { } then lib.mapAttrsToList (_: node: node.ip) members else [ source ];
+      description = "The addresses a host name, genus or literal address or CIDR stands for.";
+    };
     domain = mkOption {
       type = types.str;
       default = "measlesbagel.dev";
@@ -11,6 +26,11 @@ in
     lan.subnet = mkOption {
       type = types.str;
       default = "192.168.4.0/24";
+    };
+    lan.domain = mkOption {
+      type = types.str;
+      default = "lab.${config.homelab.domain}";
+      description = "Hosts answer as <name> and <name>.<this>, on the hosts and over WireGuard.";
     };
     breakGlassKey = mkOption {
       type = types.nullOr types.str;
@@ -62,6 +82,10 @@ in
         types.submodule {
           options = {
             ip = mkOption { type = types.str; };
+            genus = mkOption {
+              type = types.str;
+              description = "The role, named for the host's tarantula genus (docs/taxonomy.md); also a host group.";
+            };
             sshHostKey = mkOption {
               type = types.nullOr types.str;
               default = null;
@@ -95,6 +119,7 @@ in
 
   config.homelab.nodes = {
     seladonia = {
+      genus = "typhochlaena";
       ip = "192.168.4.39";
       bootstrapTarget = "root@192.168.4.39"; # Proxmox
       roles = [
@@ -103,6 +128,7 @@ in
       ];
     };
     albipes = {
+      genus = "hapalotremus";
       ip = "192.168.4.41";
       bootstrapTarget = "root@192.168.4.41"; # UGOS, root SSH enabled for provisioning
       roles = [
@@ -112,11 +138,13 @@ in
       ];
     };
     chilense = {
+      genus = "homoeomma";
       ip = "192.168.4.21";
       roles = [ "desktop" ];
     };
 
     leetzi = {
+      genus = "cyriocosmus";
       ip = "192.168.4.51";
       # DGX OS; root takes keys only, added via sparkrun's sudo.
       bootstrapTarget = "root@192.168.4.51";
@@ -126,6 +154,7 @@ in
       ];
     };
     elegans = {
+      genus = "cyriocosmus";
       ip = "192.168.4.50";
       # DGX OS; root takes keys only, added via sparkrun's sudo.
       bootstrapTarget = "root@192.168.4.50";
