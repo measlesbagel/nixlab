@@ -1,22 +1,14 @@
 # Taxonomy
 
 Hosts are named binomially after dwarf tarantulas (Theraphosidae). The genus
-is the role and the host's Tailscale tag; the specific epithet is the
-hostname.
+is the role; the specific epithet is the hostname.
 
-| Role | Genus (tag) | Species (host) | Why |
+| Role | Genus | Species (host) | Why |
 | --- | --- | --- | --- |
 | Lab | *Typhochlaena* | *T. seladonia* | Lives in a silk retreat behind a trapdoor under tree bark; the lab is the door everything passes through. |
 | NAS | *Hapalotremus* | *H. albipes* | Its genus burrows in the high Andes, one species above 4,400 m: cold storage. |
 | Workstation | *Homoeomma* | *H. chilense* | The one you live with. |
 | Sparks | *Cyriocosmus* | *C. leetzi*, *C. elegans* | Dwarf tigers, among the smallest tarantulas, on the biggest compute. |
-
-Tags that are not hosts take life-cycle stages:
-
-| Tag | Stage | Holder |
-| --- | --- | --- |
-| `tag:instar` | the stage between molts | the kexec installer |
-| `tag:molt` | shedding the old exoskeleton | the provisioning client, which turns an old OS into NixOS |
 
 ## Adding a host
 

@@ -84,7 +84,7 @@ lib.mkMerge [
     power.ups = {
       enable = true;
       mode = "netclient";
-      # LAN, not the tailnet: the router has no battery.
+      # By IP: the router, and with it DNS, has no battery.
       upsmon.monitor.ups = {
         system = "ups@${nodes.${server}.ip}";
         user = "secondary";

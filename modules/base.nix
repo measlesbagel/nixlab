@@ -38,8 +38,7 @@
     };
   };
 
-  # Logins are opkssh or the break-glass key (modules/ssh.nix), plus Tailscale
-  # SSH until it is removed.
+  # Logins are opkssh or the break-glass key (modules/ssh.nix).
   users.users = {
     measles = {
       isNormalUser = true;

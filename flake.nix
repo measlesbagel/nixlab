@@ -48,7 +48,6 @@
           ./modules/topology.nix
           ./modules/base.nix
           ./modules/lan.nix
-          ./modules/tailscale.nix
           ./modules/ssh.nix
           ./modules/opnix.nix
           ./modules/backup.nix
@@ -137,13 +136,17 @@
           ]
           ++ spec.modules;
 
-        deployTargets = {
-          seladonia.targetHost = "seladonia";
-          albipes.targetHost = "albipes";
-          chilense.targetHost = "chilense";
-          leetzi.targetHost = "leetzi";
-          elegans.targetHost = "elegans";
-        };
+        inherit ((lib.evalModules { modules = [ ./modules/topology.nix ]; }).config.homelab) nodes;
+
+        # Pinned keys are checked; a host with none yet is trusted on first use.
+        knownHosts = builtins.toFile "nixlab-known-hosts" (
+          lib.concatStrings (
+            lib.mapAttrsToList (name: node: "${name},${node.ip} ${node.sshHostKey}
+") (
+              lib.filterAttrs (_: node: node.sshHostKey != null) nodes
+            )
+          )
+        );
       in
       {
         systems = [
@@ -169,13 +172,14 @@
                 tags = [ "homelab" ];
                 # As comin does: the host builds, pulling what it can from Attic.
                 buildOnTarget = true;
-                # Tailscale SSH authenticates the node, so first contact is safe.
+                targetHost = nodes.${name}.ip;
                 sshOptions = [
+                  "-o"
+                  "UserKnownHostsFile=~/.ssh/known_hosts ${knownHosts}"
                   "-o"
                   "StrictHostKeyChecking=accept-new"
                 ];
-              }
-              // deployTargets.${name};
+              };
               imports = hostModules spec;
             }) hosts
           );
@@ -230,7 +234,6 @@
               runtimeInputs = [
                 pkgs.nixos-anywhere
                 pkgs.openssh
-                pkgs.curl
                 pkgs.jq
               ];
               # `op` comes from the host, for 1Password's desktop integration.
@@ -243,8 +246,6 @@
                         inherit (spec) system;
                         inherit (inputs.self.nixosConfigurations.${name}.config.homelab.nodes.${name})
                           ip
-                          tailscaleName
-                          tailscaleTags
                           bootstrapTarget
                           ;
                       }) hosts
@@ -263,14 +264,12 @@
               ];
               text = ''
                 if [ "$#" -eq 0 ]; then
-                  set -- ${lib.concatStringsSep " " (lib.attrNames deployTargets)}
+                  set -- ${lib.concatStringsSep " " (lib.attrNames hosts)}
                 fi
 
-                colmena apply --on "$(IFS=,; echo "$*")"
-
-                for host in "$@"; do
-                  ssh -o StrictHostKeyChecking=accept-new "deploy@$host" sudo deploy-confirm
-                done
+                on=$(IFS=,; echo "$*")
+                colmena apply --on "$on"
+                colmena exec --on "$on" -- sudo deploy-confirm
               '';
             };
             # Compares committed HEAD only; uncommitted edits are ignored.
