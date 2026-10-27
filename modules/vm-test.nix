@@ -42,17 +42,42 @@ in
             from datetime import timedelta
 
             unverifiable = ${builtins.toJSON unverifiable}
+            down = set()
+
+            def stuck():
+                units = machine.succeed("systemctl list-units --state=failed,auto-restart --plain --no-legend | cut -d' ' -f1").split()
+                down.update(units)
+                return [unit for unit in units if unit not in unverifiable]
+
+            def restarts():
+                blocks = machine.succeed("systemctl show '*.service' -p Id,NRestarts").split("\n\n")
+                units = [dict(line.split("=", 1) for line in block.splitlines()) for block in blocks if block.strip()]
+                return {unit["Id"]: int(unit["NRestarts"]) for unit in units}
+
             machine.execute("systemctl is-system-running --wait", timeout=timedelta(minutes=2))
             # A unit that failed once early may still be waiting out RestartSec.
             for _ in range(60):
-                broken = machine.succeed("systemctl list-units --state=failed,auto-restart --plain --no-legend | cut -d' ' -f1").split()
-                unexpected = [unit for unit in broken if unit not in unverifiable]
+                unexpected = stuck()
                 if not unexpected:
                     break
                 machine.sleep(duration=timedelta(seconds=1))
+
+            # A crash loop looks clean between restarts, and can keep step with
+            # the polling, so its restart count is watched too.
+            before = restarts()
+            for _ in range(15):
+                machine.sleep(duration=timedelta(seconds=1))
+                unexpected += stuck()
+            churn = [unit for unit, count in restarts().items() if unit not in unverifiable and count > before.get(unit, 0)]
+
             for unit, reason in sorted(unverifiable.items()):
-                print(f"not verified: {unit} ({reason}){', failed or restarting' if unit in broken else '''}")
-            assert not unexpected, f"failed or restarting: {' '.join(unexpected)}"
+                print(f"not verified: {unit} ({reason}){', failed or restarting' if unit in down else '''}")
+            problems = []
+            if unexpected:
+                problems.append(f"failed or restarting: {' '.join(sorted(set(unexpected)))}")
+            if churn:
+                problems.append(f"restarted after the boot settled: {' '.join(churn)}")
+            assert not problems, "; ".join(problems)
       '')
     ];
   };

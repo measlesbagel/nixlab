@@ -60,13 +60,20 @@ One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
 A host's boot test is disko's `installTest`. It formats scratch disks from
 the host's disko layout, installs the host's own system and bootloader,
 boots it under KVM, and runs the checks that its modules add to
-`disko.tests.extraChecks`. Once the boot settles, a failed or crash-looping
-unit fails the test, except those in `homelab.vmTest.unverifiable`, which need
-what a VM lacks: 1Password secrets, the LAN, or USB and SMART hardware
-(`modules/vm-test.nix`). That check cannot see an excused unit, or a unit
-that systemd skipped because a dependency failed. CI runs it for each changed
-host marked `vmTest` in `flake.nix`. To run one locally, on a machine with
-KVM:
+`disko.tests.extraChecks`. Once the boot settles, a unit that is failed or
+restarting, or that systemd restarts during the next 15 s, fails the test. A
+unit may fail early and recover on a restart. Units in
+`homelab.vmTest.unverifiable` are excused, because they need what a VM lacks:
+1Password secrets, the LAN, or USB and SMART hardware
+(`modules/vm-test.nix`). The check cannot see:
+- an excused unit;
+- a unit that systemd skipped because a dependency failed;
+- a daemon whose parent exits 0 while its child dies, as `rpc.mountd` did
+  (`modules/nfs-server.nix` checks that one itself);
+- a unit that stays up for over 15 s between crashes.
+
+CI runs it for each changed host marked `vmTest` in `flake.nix`. To run one
+locally, on a machine with KVM:
 
 ```console
 nix build .#nixosConfigurations.seladonia.config.system.build.installTest -L
