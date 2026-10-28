@@ -19,7 +19,7 @@ Bare-metal NixOS homelab monorepo, the public source of truth for the fleet.
 | Host | Role |
 | --- | --- |
 | seladonia | mini PC — services plane (edge, postgres, media apps) |
-| albipes | NAS — ZFS, NFS (music, models), RustFS S3, Nix cache |
+| albipes | NAS — ZFS, NFS (music, models), RustFS S3 |
 | chilense | desktop — personal computer, dev env, RTX 4090 |
 | leetzi, elegans | Asus GX10 (GB10, aarch64) inference nodes |
 
@@ -29,9 +29,9 @@ Hosts are named after dwarf tarantulas: [docs/taxonomy.md](docs/taxonomy.md).
 
 Merge to `main`. Every host runs [comin](https://github.com/nlewo/comin)
 (`modules/comin.nix`): it polls `main`, builds its own
-`nixosConfigurations.<host>` (pulling from the lab cache on albipes, which
-hosts fill as they build) and switches. GitHub holds no credential that
-reaches the lab; branch protection on `main` is the deploy gate.
+`nixosConfigurations.<host>` (pulling from the public Cachix cache that CI
+fills) and switches. GitHub holds no credential that reaches the lab; branch
+protection on `main` is the deploy gate.
 
 ```console
 comin status                    # on a host: what it runs and what it's doing
@@ -45,8 +45,9 @@ comin confirms only once the host passes `deploy-health` and can still reach
 GitHub. Hosts reboot into a new kernel by themselves at night, once idle
 (`modules/reboot.nix`).
 
-PRs run `ci.yml` (checks and a build of each changed host); it publishes
-nothing. One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
+PRs run `ci.yml` (checks and a build of each changed host); a same-repo PR
+pushes what it built to the Cachix cache. One-time setup:
+[docs/ci-setup.md](docs/ci-setup.md).
 
 ## Remote access
 

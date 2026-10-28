@@ -101,8 +101,7 @@ run() {
 # A foreign-architecture host builds its own system on the installer, natively:
 # a Spark kernel no cache has takes hours to build here under emulation.
 # nixos-anywhere hands the installer the host's own substituters (graham33,
-# Flox, lab cache), so it only builds what none of them have.
-# Later deploys download it from the lab cache.
+# Flox, Cachix), so it only builds what none of them have.
 buildOn=()
 if [ "$system" != "$(nix config show system)" ]; then
   buildOn=(--build-on remote)

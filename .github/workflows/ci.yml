@@ -92,7 +92,7 @@ jobs:
           ' <<< "$hosts")
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
 
-  # No secrets; the lab cache only through its public read-only route.
+  # No secrets.
   build:
     name: Build ${{ matrix.name }}
     needs: changed
@@ -110,10 +110,9 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      # Substitutes from the public caches the hosts trust, and reads what the
-      # hosts already built through Attic's public read-only route
-      # (services/attic-public.nix) once its key is committed. The installer
-      # trusts the runner user, which --option needs.
+      # Substitutes from the caches each host trusts, ours included
+      # (modules/cache.nix). The installer trusts the runner user, which
+      # --option needs.
       # --keep-going: one grouped host failing must not hide whether the others build.
       - name: Build closure
         env:
@@ -125,10 +124,9 @@ jobs:
             caches=$(nix eval --json ".#nixosConfigurations.$host.config" --apply 'c: {
               subs = c.nix.settings.extra-substituters or [ ];
               keys = c.nix.settings.extra-trusted-public-keys or [ ];
-              inherit (c.homelab.cache) publicUrl publicKey;
             }')
-            mapfile -t -O "${#subs[@]}" subs < <(jq -r '.subs[], (select(.publicKey) | .publicUrl)' <<< "$caches")
-            mapfile -t -O "${#keys[@]}" keys < <(jq -r '.keys[], (.publicKey // empty)' <<< "$caches")
+            mapfile -t -O "${#subs[@]}" subs < <(jq -r '.subs[]' <<< "$caches")
+            mapfile -t -O "${#keys[@]}" keys < <(jq -r '.keys[]' <<< "$caches")
           done
           opts=()
           if ((${#subs[@]})); then
