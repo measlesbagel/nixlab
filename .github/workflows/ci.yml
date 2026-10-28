@@ -92,7 +92,7 @@ jobs:
           ' <<< "$hosts")
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
 
-  # No secrets.
+  # The Cachix token reaches only the Cachix action, and only on same-repo PRs.
   build:
     name: Build ${{ matrix.name }}
     needs: changed
@@ -110,6 +110,41 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      # Cachix pushes the whole closure of each path a build made, so a path
+      # substituted from Flox or graham33 would go up with it: push only when
+      # every host substitutes from cache.nixos.org and our cache alone. The
+      # server drops what cache.nixos.org has while the cache's upstream
+      # caches setting stays on.
+      - name: Plan Cachix push
+        id: cachix
+        env:
+          HOSTS: ${{ matrix.hosts }}
+        run: |
+          read -ra hosts <<< "$HOSTS"
+          push=true
+          for host in "${hosts[@]}"; do
+            cache=$(nix eval --json ".#nixosConfigurations.$host.config" --apply 'c: {
+              inherit (c.homelab.cache) name;
+              subs = c.nix.settings.substituters ++ (c.nix.settings.extra-substituters or [ ]);
+            }')
+            name=$(jq -r .name <<< "$cache")
+            jq -e --arg own "https://$name.cachix.org" '
+              ((.subs | map(rtrimstr("/")) | unique) - ["https://cache.nixos.org", $own]) == []
+            ' <<< "$cache" > /dev/null || push=false
+          done
+          bin=$(nix build --inputs-from . 'nixpkgs#cachix^bin' --no-link --print-out-paths)/bin/cachix
+          echo "cache $name, push $push"
+          printf '%s\n' "name=$name" "push=$push" "bin=$bin" >> "$GITHUB_OUTPUT"
+      # Starts before the build so Nix's post-build hook sees every build; the
+      # push is the action's post step. Fork and Dependabot PRs have an empty
+      # token, which leaves it nothing to push and does not fail it.
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: ${{ steps.cachix.outputs.name }}
+          cachixBin: ${{ steps.cachix.outputs.bin }}
+          authToken: ${{ steps.cachix.outputs.push == 'true' && secrets.CACHIX_AUTH_TOKEN || '' }}
+          skipPush: ${{ steps.cachix.outputs.push != 'true' }}
+          skipAddingSubstituter: true # the hosts' own config adds it
       # Substitutes from the caches each host trusts, ours included
       # (modules/cache.nix). The installer trusts the runner user, which
       # --option needs.
