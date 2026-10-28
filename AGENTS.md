@@ -39,10 +39,10 @@ Rules for AI/agent sessions in this repo.
   `.github/workflows/commits.yml` checks both.
 - Hosts deploy themselves (comin); CI never reaches the lab. It pushes what
   it built to the public Cachix cache (docs/ci-setup.md) with
-  `CACHIX_AUTH_TOKEN`, a secret only same-repo PRs get. The
-  break-glass push (`nix run .#deploy`) goes over the LAN to the scoped
-  `deploy` user, through opkssh or the break-glass key
-  (docs/remote-access.md). Root SSH stays off.
+  `CACHIX_AUTH_TOKEN`, a secret only same-repo PRs get and which can change
+  what every host substitutes. The break-glass push (`nix run .#deploy`) goes
+  over the LAN to the scoped `deploy` user, through opkssh or the break-glass
+  key (docs/remote-access.md). Root SSH stays off.
 
 ## Validation
 

@@ -30,8 +30,9 @@ Hosts are named after dwarf tarantulas: [docs/taxonomy.md](docs/taxonomy.md).
 Merge to `main`. Every host runs [comin](https://github.com/nlewo/comin)
 (`modules/comin.nix`): it polls `main`, builds its own
 `nixosConfigurations.<host>` (pulling from the public Cachix cache that CI
-fills) and switches. GitHub holds no credential that reaches the lab; branch
-protection on `main` is the deploy gate.
+fills) and switches. GitHub holds no credential that reaches the lab, and
+branch protection on `main` gates what hosts build. The Cachix token can still
+change what they substitute ([docs/ci-setup.md](docs/ci-setup.md)).
 
 ```console
 comin status                    # on a host: what it runs and what it's doing

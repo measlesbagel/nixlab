@@ -79,9 +79,14 @@ How the push works:
 - Only same-repo PRs get the token. A fork or Dependabot PR gets an empty one,
   and the action then pushes nothing and does not fail. Nix builds run in a
   sandbox and cannot read the token, but the action writes it to the runner's
-  `~/.config/cachix/cachix.dhall`. Any step of that job can read it, and so can
-  anyone who can push a branch here. It writes to this cache only; revoke it in
-  the cache's settings if in doubt.
+  `~/.config/cachix/cachix.dhall`, so any step of that job can.
+- Whoever holds the token can change what every host substitutes, because
+  Cachix signs what it uploads with the key the hosts trust. A same-repo PR
+  runs its own copy of `ci.yml`. Anyone who can push a branch here can
+  therefore read the token and upload a path that a host then installs, without
+  the code-owner review that gates `main`. Revoke the token in the cache's
+  settings if in doubt. To close the gap, keep the secret in a GitHub
+  Environment with required reviewers, or push only from `cd.yml` on `main`.
 - The first run with a token must not log that the user is "not allowed to set
   the post-build-hook". The action then falls back to scanning the store, which
   also uploads substituted paths.
