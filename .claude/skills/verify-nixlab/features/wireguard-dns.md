@@ -50,11 +50,9 @@ Steps:
 
 ## Gotchas
 
-- Never ask from the host itself with a `10.100.0.0/24` source, such as
-  `-b 10.100.0.1` or an address added to `lo`. `wireguard-nat` masquerades
-  that traffic on `lo` to the address of whichever interface registered
-  first. So the answer flips between NOERROR and REFUSED from boot to boot.
-  Ask from the `peer` namespace. Real peers are not affected.
+- Asking from the host itself with a `10.100.0.0/24` source, such as
+  `-b 10.100.0.1`, gets an answer, but over `lo`: it skips `wg0` and the
+  firewall. Ask from the `peer` namespace to see what a peer sees.
 - `wg-test-peer.sh` is not idempotent: a second run fails at
   `ip netns add peer`. The peer stays on `wg0` until `wg0` restarts.
 - The peer proves the handshake and the firewall path over a veth. It does not

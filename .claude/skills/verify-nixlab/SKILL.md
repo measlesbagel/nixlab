@@ -124,7 +124,7 @@ as unverified whenever a change touches them.
 - Secrets: OpNix has no `/etc/opnix-token`, so ACME, Caddy's certificate,
   Pocket ID, DDNS and restic fail.
 - Network: the LAN and the internet (Navidrome's NFS from albipes, the RustFS
-  backup, the Attic substituter, WireGuard peers), and DNS answered from the
+  backup, the Cachix substituter, WireGuard peers), and DNS answered from the
   real LAN.
 - Provisioning: the kexec and nixos-anywhere install, which only
   `provision --dry-run` approaches.
