@@ -30,9 +30,9 @@
     nixos-images.inputs.nixos-unstable.follows = "nixpkgs";
     nixos-images.inputs.nixos-stable.follows = "nixpkgs";
 
-    # Follows our nixpkgs: its kernel is in no public cache either way.
+    # Keeps its own nixpkgs: the Sparks take their kernel and NVIDIA driver
+    # from it (modules/spark.nix), as upstream's full builds cache them.
     nixos-dgx-spark.url = "github:graham33/nixos-dgx-spark";
-    nixos-dgx-spark.inputs.nixpkgs.follows = "nixpkgs";
     nixos-dgx-spark.inputs.disko.follows = "disko";
     nixos-dgx-spark.inputs.flake-parts.follows = "flake-parts";
   };

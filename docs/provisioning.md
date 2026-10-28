@@ -60,9 +60,9 @@ other copy is on chilense, whose provisioning formats that disk. Follow
   (`boot.binfmt.emulatedSystems = [ "aarch64-linux" ]` on NixOS,
   `extra-platforms` plus qemu-user binfmt elsewhere). The first build takes
   about an hour; it is reused until nixpkgs changes.
-- **The system builds on the Spark** (`--build-on remote`, about half an
-  hour): the NVIDIA kernel is in no public cache. Later deploys come from the
-  lab cache.
+- **The system builds on the Spark** (`--build-on remote`). The NVIDIA kernel
+  comes from graham33.cachix.org once upstream's full build has cached its
+  current kernel; otherwise the Spark compiles it, in about half an hour.
 - **The installer's stock kernel may not get Ethernet** on the RTL8127
   (mainline `r8169`). If it never comes back on its address, fall back to
   a USB install; keep a DGX OS recovery USB to hand either way.

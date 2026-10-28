@@ -98,21 +98,30 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      # Reads what the hosts already built through the public read-only route
-      # (services/attic-public.nix); skipped until the cache key is committed.
+      # Substitutes from the public caches the hosts trust, and reads what the
+      # hosts already built through Attic's public read-only route
+      # (services/attic-public.nix) once its key is committed. The installer
+      # trusts the runner user, which --option needs.
       # --keep-going: one grouped host failing must not hide whether the others build.
       - name: Build closure
         env:
           HOSTS: ${{ matrix.hosts }}
         run: |
           read -ra hosts <<< "$HOSTS"
-          cache=$(nix eval --json ".#nixosConfigurations.${hosts[0]}.config.homelab.cache" \
-            --apply 'c: { inherit (c) publicUrl publicKey; }')
-          key=$(jq -r '.publicKey // empty' <<< "$cache")
+          subs=() keys=()
+          for host in "${hosts[@]}"; do
+            caches=$(nix eval --json ".#nixosConfigurations.$host.config" --apply 'c: {
+              subs = c.nix.settings.extra-substituters or [ ];
+              keys = c.nix.settings.extra-trusted-public-keys or [ ];
+              inherit (c.homelab.cache) publicUrl publicKey;
+            }')
+            mapfile -t -O "${#subs[@]}" subs < <(jq -r '.subs[], (select(.publicKey) | .publicUrl)' <<< "$caches")
+            mapfile -t -O "${#keys[@]}" keys < <(jq -r '.keys[], (.publicKey // empty)' <<< "$caches")
+          done
           opts=()
-          if [ -n "$key" ]; then
-            opts=(--option extra-substituters "$(jq -r .publicUrl <<< "$cache")"
-              --option extra-trusted-public-keys "$key"
+          if ((${#subs[@]})); then
+            opts=(--option extra-substituters "$(printf '%s\n' "${subs[@]}" | sort -u | paste -sd ' ')"
+              --option extra-trusted-public-keys "$(printf '%s\n' "${keys[@]}" | sort -u | paste -sd ' ')"
               --option connect-timeout 5)
           fi
           targets=()
