@@ -71,6 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       builds: ${{ steps.changed.outputs.builds }}
+      attributes: ${{ steps.changed.outputs.attributes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,6 +92,48 @@ jobs:
                | if length > 0 then [{name: (map(.host) | join(", ")), system: "aarch64-linux", hosts: (map(.host) | join(" "))}] else [] end)
           ' <<< "$hosts")
           echo "builds=$builds" >> "$GITHUB_OUTPUT"
+          # nix-diff-action reads its attributes input as YAML, which accepts JSON.
+          # It evaluates each attribute on the base too, so added hosts are left out.
+          attributes=$(jq -c 'map(select(.added | not) | {displayName: .host, attribute: "nixosConfigurations.\(.host).config.system.build.toplevel"})' <<< "$hosts")
+          echo "attributes=$attributes" >> "$GITHUB_OUTPUT"
+
+  # The only job with a write token, scoped to PR comments. Evaluation only:
+  # it diffs the .drv files, so the Spark kernel is not built a second time.
+  # Dependabot's pull_request token is read-only, so its PRs get no comment.
+  diff:
+    name: Closure diff
+    needs: changed
+    if: needs.changed.outputs.attributes != '[]' && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # nix-diff-action posts the diff as a PR comment
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
+      # v1.1.1 finds its comment by the host name when one host changed and by a
+      # shared marker otherwise, so a changed set of another size would post a
+      # second comment. Re-key the existing one to the marker it will look for.
+      - name: Re-key the existing comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMENTS: repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments
+          ATTRIBUTES: ${{ needs.changed.outputs.attributes }}
+        run: |
+          set -euo pipefail
+          marker=$(jq -r 'if length == 1 then "<!-- nix-diff-action:\(.[0].displayName) -->" else "<!-- nix-diff-action -->" end' <<< "$ATTRIBUTES")
+          url=$(gh api --paginate "$COMMENTS" \
+            --jq '.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("<!-- nix-diff-action"))) | .url' | sed -n 1p)
+          if [ -n "$url" ]; then
+            body=$(gh api "$url" --jq .body)
+            gh api --method PATCH "$url" -f "body=$marker"$'\n'"${body#*$'\n'}" > /dev/null
+          fi
+      - uses: natsukium/nix-diff-action@4091452e4c7b3c7ea4ecbaec84be7f0066d810d7 # v1.1.1
+        with:
+          attributes: ${{ needs.changed.outputs.attributes }}
+          comment-strategy: update
 
   # The Cachix token reaches only the Cachix action, and only on same-repo PRs.
   build:

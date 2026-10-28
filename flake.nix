@@ -295,16 +295,22 @@
                 drv() { nix eval --raw "git+file://$PWD?rev=$1#nixosConfigurations.$2.config.system.build.toplevel.drvPath"; }
 
                 changed=()
+                added=()
                 for host in ${lib.concatStringsSep " " (lib.attrNames hosts)}; do
                   new=$(drv "$head" "$host")
                   old=$(drv "$base" "$host" 2> /dev/null || echo none)
                   if [ "$new" != "$old" ]; then
                     changed+=("$host")
+                    if [ "$old" = none ]; then
+                      added+=("$host")
+                    fi
                   fi
                 done
 
+                # added: not evaluable on the base, so there is nothing to diff against.
                 jq -cn --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
-                  '$ARGS.positional | map({host: ., system: $systems[.]})' --args "''${changed[@]}"
+                  --argjson added "$(printf '%s\n' "''${added[@]}" | jq -Rnc '[inputs | select(. != "")]')" \
+                  '$ARGS.positional | map({host: ., system: $systems[.], added: (. as $h | $added | index($h) != null)})' --args "''${changed[@]}"
               '';
             };
 
