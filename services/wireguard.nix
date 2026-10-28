@@ -35,7 +35,8 @@ in
     content = ''
       chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
-        ip saddr ${wireguard.subnet} ip daddr != { ${lib.concatStringsSep ", " labIps} } oifname != "wg0" masquerade
+        # On lo, masquerade swaps the host's own wg0 address for another interface's.
+        ip saddr ${wireguard.subnet} ip daddr != { ${lib.concatStringsSep ", " labIps} } oifname != { "wg0", "lo" } masquerade
       }
     '';
   };
