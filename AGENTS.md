@@ -32,6 +32,11 @@ Rules for AI/agent sessions in this repo.
   other files). Keep them short; never restate the code or narrate history,
   which belongs in the commit message.
 - Public repo: IPs and hostnames are fine to commit; nothing else sensitive.
+- Commit subjects and PR titles are Conventional Commits:
+  `<type>(<scope>): <imperative summary>`, type one of feat, fix, docs, style,
+  refactor, perf, test, build, ci, chore or revert; an area like `zfs` is a
+  scope, not a type. PRs land squashed under their title, and
+  `.github/workflows/commits.yml` checks both.
 - Hosts deploy themselves (comin); CI never reaches the lab or writes to the
   cache. The break-glass push (`nix run .#deploy`) goes over the LAN
   to the scoped `deploy` user, through opkssh or the break-glass key
