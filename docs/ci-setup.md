@@ -17,16 +17,16 @@ nothing in it reaches the lab.
    approval for every outside contributor's run; a read-only default token
    that cannot approve PRs.
 3. Ruleset `main`: require a pull request with code-owner review and the
-   `Secret scan`, `Workflow lint`, `Flake check` and `Commit format` status
-   checks; block force pushes and deletion; repository admins bypass.
-   (`Build <host>` exists only for changed hosts, so it cannot be required by
-   name.) `.github/CODEOWNERS` makes the owner review every PR, so agent
-   accounts cannot merge their own. Pull requests merge by squash only, with
-   the PR title as the commit subject (Settings > General > Pull Requests).
-   This ruleset is the deploy gate: every host applies whatever lands on
-   `main`, provided GitHub signed the tip commit (`modules/comin.nix`). Merge
-   in the web UI; a commit pushed straight to `main`, even by an admin, is not
-   deployed until a signed one lands on top.
+   `Secret scan`, `Workflow lint`, `Flake check`, `Commit format` and
+   `Flake lock` status checks; block force pushes and deletion; repository
+   admins bypass. (`Build <host>` exists only for changed hosts, so it cannot
+   be required by name.) `.github/CODEOWNERS` makes the owner review every PR,
+   so agent accounts cannot merge their own. Pull requests merge by squash
+   only, with the PR title as the commit subject (Settings > General > Pull
+   Requests). This ruleset is the deploy gate: every host applies whatever
+   lands on `main`, provided GitHub signed the tip commit
+   (`modules/comin.nix`). Merge in the web UI; a commit pushed straight to
+   `main`, even by an admin, is not deployed until a signed one lands on top.
 4. Secret scanning with push protection, Dependabot alerts and private
    vulnerability reporting.
 5. First push: `[skip ci]` in the head commit.
