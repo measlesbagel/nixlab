@@ -9,7 +9,11 @@ nothing in it reaches the lab.
 1. Create `measlesbagel/nixlab`, public, with pull requests restricted to
    collaborators (Settings > General > Features; UI only).
 2. Actions: only GitHub-owned actions plus `DeterminateSystems/*`,
-   `gitleaks/*` and `zizmorcore/*`, SHA pinning required;
+   `gitleaks/*` and `zizmorcore/*`, and the actions `update-flake-lock`
+   calls, which the list also gates: `peter-evans/create-pull-request@*`,
+   `DamianReeves/write-file-action@*`, `pedrolamas/handlebars-action@*`,
+   `juliangruber/read-file-action@*` and `crazy-max/ghaction-import-gpg@*`
+   (it pins them by SHA). SHA pinning required;
    approval for every outside contributor's run; a read-only default token
    that cannot approve PRs.
 3. Ruleset `main`: require a pull request with code-owner review and the
@@ -87,3 +91,29 @@ Once both Sparks are provisioned, commit each one's
 `/etc/ssh/ssh_host_ed25519_key.pub` as `sshHostKey` in `modules/topology.nix`.
 leetzi then builds on elegans as `nix-builder` over the ConnectX-7 link,
 authenticated by its host key; until both are set, each Spark builds alone.
+
+## Flake lock updates
+
+`.github/workflows/update-flake-lock.yml` runs `nix flake update` every
+Monday at 09:17 UTC and opens one PR, `chore(flake): update flake.lock`,
+from the branch `update_flake_lock_action`. A later run updates that same PR.
+Dependabot only bumps GitHub Actions (`.github/dependabot.yml`).
+
+The PR is opened with a personal access token, because GitHub starts no
+workflows for a PR that `GITHUB_TOKEN` opens, so CI would never run on it.
+It therefore shows as opened by measlesbagel, runs the full CI like any PR,
+and its commit is authored by `github-actions[bot]`. After review, merge it in
+the web UI. That deploys like any other merge, because comin only deploys tips
+that GitHub signed.
+
+Before the first run, create a fine-grained token with resource owner
+measlesbagel, only the `nixlab` repository, Contents and Pull requests read
+and write, and no expiration, and add it as the Actions secret
+`FLAKE_UPDATE_TOKEN`.
+
+Schedules and manual runs use the workflow on `main`, so nothing runs before
+it merges. After the merge and the token, trigger the first run with:
+
+```console
+gh workflow run update-flake-lock.yml
+```
