@@ -39,6 +39,16 @@ in
   # The module enables it unconditionally.
   services.dgx-dashboard.enable = lib.mkForce false;
 
+  # Upstream's full builds push the NVIDIA kernel, its modules and nvidia-open
+  # here. A hit needs our nixpkgs to yield the same kernel derivation as one
+  # of those builds; otherwise the Spark compiles it. The module adds Flox.
+  nix.settings = {
+    extra-substituters = [ "https://graham33.cachix.org" ];
+    extra-trusted-public-keys = [
+      "graham33.cachix.org-1:DqH72VpwSrACa3+L9eqh4bixjWx9IQUaxQtRh4gtkX8="
+    ];
+  };
+
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 

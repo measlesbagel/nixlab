@@ -52,7 +52,7 @@ in
         branches.testing.name = "";
       }
     ];
-    # A Spark compiles its NVIDIA kernel when Attic lacks it.
+    # A Spark compiles its NVIDIA kernel when no cache has it.
     buildTimeout = 7200;
     postDeploymentCommand = lib.getExe confirm;
     # Only a tip commit GitHub made (web-UI merges, Dependabot) deploys, so a

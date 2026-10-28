@@ -28,6 +28,14 @@ nothing in it reaches the lab.
 Remote access and SSH logins (WireGuard, Pocket ID, opkssh) are set up
 once per [remote-access.md](remote-access.md).
 
+## Public caches
+
+Besides cache.nixos.org, the Sparks substitute from graham33.cachix.org
+(`modules/spark.nix`), where upstream's full builds push the NVIDIA kernel,
+and from cache.flox.dev for CUDA, which upstream's module adds. CI's build job
+substitutes from each host's `nix.settings.extra-substituters`, so it
+downloads what that host would.
+
 ## Lab binary cache
 
 Each host builds its own system, pulling from Attic on albipes
@@ -66,8 +74,8 @@ the Nix store. Hosts use it on the LAN. CI reads it through
 on seladonia passes only `GET` and `HEAD` under `/nixlab/` and drops any
 `Authorization` header, so the token API stays LAN-only. A PR that changes
 nothing under the Spark kernel then downloads it instead of rebuilding it for
-two hours; a kernel change still builds in full, because CI runs before any
-host has built it. Each CI download counts against the home uplink.
+two hours; a kernel change graham33.cachix.org lacks still builds in full,
+because CI runs before any host has built it. Each CI download counts against the home uplink.
 
 ## Remote builder (leetzi → elegans)
 

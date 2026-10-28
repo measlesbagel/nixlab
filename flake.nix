@@ -30,7 +30,8 @@
     nixos-images.inputs.nixos-unstable.follows = "nixpkgs";
     nixos-images.inputs.nixos-stable.follows = "nixpkgs";
 
-    # Follows our nixpkgs: its kernel is in no public cache either way.
+    # Follows our nixpkgs, so its kernel comes from graham33.cachix.org only
+    # while our nixpkgs yields the one an upstream full build made.
     nixos-dgx-spark.url = "github:graham33/nixos-dgx-spark";
     nixos-dgx-spark.inputs.nixpkgs.follows = "nixpkgs";
     nixos-dgx-spark.inputs.disko.follows = "disko";
