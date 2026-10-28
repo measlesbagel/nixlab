@@ -7,6 +7,10 @@
   ...
 }:
 let
+  # Built by upstream's own nixpkgs, as its full builds push it to
+  # graham33.cachix.org; the rest of the system stays on ours.
+  upstreamKernel = inputs.nixos-dgx-spark.nixosConfigurations.dgx-spark.config.boot.kernelPackages;
+
   # In a memory-pressure livelock PID 1 still pets RuntimeWatchdogSec, so this
   # pets the hardware watchdog only while fork/exec still works.
   hangWatchdog = pkgs.writeShellApplication {
@@ -38,6 +42,27 @@ in
   hardware.dgx-spark.enable = true;
   # The module enables it unconditionally.
   services.dgx-dashboard.enable = lib.mkForce false;
+
+  # The NVIDIA driver comes from this set too.
+  boot.kernelPackages = lib.mkForce upstreamKernel;
+  # The driver's libraries load into our processes, which cannot provide
+  # symbols from a newer glibc.
+  assertions = [
+    {
+      assertion = lib.versionAtLeast pkgs.glibc.version upstreamKernel.stdenv.cc.libc.version;
+      message = "nixos-dgx-spark's nixpkgs has glibc ${upstreamKernel.stdenv.cc.libc.version}, newer than ours (${pkgs.glibc.version}): update nixpkgs too.";
+    }
+  ];
+
+  # Upstream's full builds push the kernel, its modules and the driver here.
+  # Until one has run for upstream's current kernel, the Spark compiles it.
+  # The module adds Flox.
+  nix.settings = {
+    extra-substituters = [ "https://graham33.cachix.org" ];
+    extra-trusted-public-keys = [
+      "graham33.cachix.org-1:DqH72VpwSrACa3+L9eqh4bixjWx9IQUaxQtRh4gtkX8="
+    ];
+  };
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
