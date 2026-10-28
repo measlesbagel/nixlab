@@ -50,7 +50,8 @@ in
                 return [unit for unit in units if unit not in unverifiable]
 
             def restarts():
-                blocks = machine.succeed("systemctl show '*.service' -p Id,NRestarts").split("\n\n")
+                # Without --all, a unit that is inactive with no job is left out.
+                blocks = machine.succeed("systemctl show --all '*.service' -p Id,NRestarts").split("\n\n")
                 units = [dict(line.split("=", 1) for line in block.splitlines()) for block in blocks if block.strip()]
                 return {unit["Id"]: int(unit["NRestarts"]) for unit in units}
 
