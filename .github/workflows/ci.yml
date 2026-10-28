@@ -219,6 +219,8 @@ jobs:
           nix build "${targets[@]}" --no-link --keep-going --print-build-logs "${opts[@]}"
       # Installs each host from its disko layout and boots it under KVM, which
       # nix-installer-action enables; the closure above is already local.
+      # The empty post-build hook keeps the test's disk images and VM systems
+      # out of the Cachix push.
       - name: Boot test
         if: matrix.vmTests != ''
         timeout-minutes: 30
@@ -230,4 +232,4 @@ jobs:
           for host in "${hosts[@]}"; do
             targets+=(".#nixosConfigurations.$host.config.system.build.installTest")
           done
-          nix build "${targets[@]}" --no-link --keep-going --print-build-logs
+          nix build "${targets[@]}" --no-link --keep-going --print-build-logs --option post-build-hook ''
