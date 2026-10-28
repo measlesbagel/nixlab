@@ -1,21 +1,5 @@
 version: 2
 updates:
-  # One PR per flake input; every input follows our nixpkgs. No cooldown:
-  # Dependabot can only lock an input's newest commit, and nixos-unstable's
-  # is rarely a week old, so one would stall nixpkgs.
-  - package-ecosystem: nix # zizmor: ignore[dependabot-cooldown]
-    directory: /
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: chore
-      include: scope
-    # hjem follows hjem-rum/hjem, so it is hjem-rum's input, not ours. Dependabot
-    # would bump that node directly and drop its nixpkgs follow; hjem moves
-    # when hjem-rum is bumped instead.
-    ignore:
-      - dependency-name: hjem
-
   - package-ecosystem: github-actions
     directory: /
     schedule:

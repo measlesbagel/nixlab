@@ -75,3 +75,36 @@ Once both Sparks are provisioned, commit each one's
 `/etc/ssh/ssh_host_ed25519_key.pub` as `sshHostKey` in `modules/topology.nix`.
 leetzi then builds on elegans as `nix-builder` over the ConnectX-7 link,
 authenticated by its host key; until both are set, each Spark builds alone.
+
+## Flake lock updates
+
+`.github/workflows/update-flake-lock.yml` runs `nix flake update` every
+Monday at 09:17 UTC and opens one PR, `chore(flake): update flake.lock`,
+from the branch `update_flake_lock_action`. A later run updates that same PR.
+Dependabot only bumps GitHub Actions (`.github/dependabot.yml`).
+
+The PR is opened with a personal access token, because GitHub starts no
+workflows for a PR that `GITHUB_TOKEN` opens, so CI would never run on it.
+It therefore shows as opened by measlesbagel, runs the full CI like any PR,
+and its commit is authored by `github-actions[bot]`. After review, merge it in
+the web UI. That deploys like any other merge, because comin only deploys tips
+that GitHub signed.
+
+Two steps outside the repo, before the first run:
+
+1. Create a fine-grained token with resource owner measlesbagel, only the
+   `nixlab` repository, Contents and Pull requests read and write, and no
+   expiration. Add it as the Actions secret `FLAKE_UPDATE_TOKEN`.
+2. Add these to the allow-list from the GitHub section:
+   `peter-evans/create-pull-request@*`, `DamianReeves/write-file-action@*`,
+   `pedrolamas/handlebars-action@*`, `juliangruber/read-file-action@*` and
+   `crazy-max/ghaction-import-gpg@*`. `DeterminateSystems/*` admits only
+   `update-flake-lock` itself. The list also applies to the actions it calls,
+   and without these the run fails at "Set up job".
+
+Schedules and manual runs use the workflow on `main`, so nothing runs before
+it merges. After the merge and both steps, trigger the first run with:
+
+```console
+gh workflow run update-flake-lock.yml
+```
