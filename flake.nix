@@ -72,7 +72,6 @@
               ./services/pocket-id.nix
               ./services/wireguard.nix
               ./services/dns.nix
-              ./services/attic-public.nix
               ./services/postgresql.nix
               ./services/navidrome.nix
               ./services/model-sync.nix
@@ -85,7 +84,6 @@
               ./modules/zfs.nix
               ./services/smartd.nix
               ./services/zfs-replication.nix
-              ./services/attic.nix
               ./services/rustfs.nix
               ./services/model-library.nix
               ./services/music-share.nix
@@ -174,7 +172,7 @@
                   "homelab"
                   nodes.${name}.genus
                 ];
-                # As comin does: the host builds, pulling what it can from Attic.
+                # As comin does: the host builds, pulling what it can from its substituters.
                 buildOnTarget = true;
                 # Resolved by /etc/hosts (modules/lan.nix) or, over WireGuard,
                 # services/dns.nix.
@@ -316,7 +314,6 @@
               packages = [
                 pkgs.colmena
                 pkgs.nixos-anywhere
-                pkgs.attic-client
                 inputs.opnix.packages.${system}.default
                 pkgs._1password-cli
                 pkgs.restic

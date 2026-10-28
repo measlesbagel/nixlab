@@ -112,12 +112,6 @@
           mountpoint = "/tank/models";
           options.recordsize = "1M";
         };
-        # atticd already zstd-compresses its chunks.
-        nix-cache = {
-          type = "zfs_fs";
-          mountpoint = "/tank/nix-cache";
-          options.compression = "off";
-        };
       };
     };
   };
