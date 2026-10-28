@@ -72,6 +72,8 @@ test. A unit may fail early and recover on a restart. Units in
   (`modules/nfs-server.nix` checks that one itself);
 - a restart that `Restart=` did not schedule (`Upholds=`, an `OnFailure=`
   handler, a manual restart), because it resets the restart count;
+- a unit that nothing pulls in, such as one started by hand, because systemd
+  unloads it, restart count and all, once it stops;
 - a unit that stays up for over 15 s between crashes, or that first fails
   after the window.
 
