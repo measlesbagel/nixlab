@@ -40,8 +40,7 @@ in
   imports = [ inputs.nixos-dgx-spark.nixosModules.dgx-spark ];
 
   hardware.dgx-spark.enable = true;
-  # Sustained boost overheats some Sparks until the embedded controller cuts
-  # power without warning; the GB10 has no power limit to set instead.
+  # Sustained boost can overheat a Spark into a sudden power cut.
   hardware.dgx-spark.gpuClockCap = 2200;
   # The module enables it unconditionally.
   services.dgx-dashboard.enable = lib.mkForce false;
