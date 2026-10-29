@@ -73,10 +73,12 @@
         "local/root" = {
           type = "zfs_fs";
           mountpoint = "/";
+          options.mountpoint = "legacy";
         };
         "local/nix" = {
           type = "zfs_fs";
           mountpoint = "/nix";
+          options.mountpoint = "legacy";
         };
       };
     };
@@ -97,19 +99,23 @@
         media = {
           type = "zfs_fs";
           mountpoint = "/tank/media";
+          options.mountpoint = "legacy";
           options.recordsize = "1M";
         };
         backups = {
           type = "zfs_fs";
           mountpoint = "/tank/backups";
+          options.mountpoint = "legacy";
         };
         objects = {
           type = "zfs_fs";
           mountpoint = "/tank/objects";
+          options.mountpoint = "legacy";
         };
         models = {
           type = "zfs_fs";
           mountpoint = "/tank/models";
+          options.mountpoint = "legacy";
           options.recordsize = "1M";
         };
       };

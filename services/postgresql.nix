@@ -38,5 +38,15 @@ in
     # Only keeps a late or manual dump from overlapping an upload; the timers
     # fire independently.
     systemd.services.restic-backups-nas.after = [ "postgresqlBackup.service" ];
+
+    disko.tests.extraChecks = ''
+      with subtest("the nightly dump holds what postgres holds"):
+          machine.wait_for_unit("postgresql.service")
+          machine.succeed(
+              "runuser -u postgres -- psql -c \"create table vm_test (x text); insert into vm_test values ('in-the-dump')\"",
+              "systemctl start postgresqlBackup.service",
+              "[ $(zcat ${config.services.postgresqlBackup.location}/all.sql.gz | grep -c in-the-dump) -ge 1 ]",
+          )
+    '';
   };
 }

@@ -45,4 +45,19 @@ in
   services.cloudflare-dyndns.domains = [ "vpn.${domain}" ];
 
   homelab.watchdog.healthChecks = [ "systemctl is-active --quiet wireguard-wg0.service" ];
+
+  disko.tests.extraChecks = ''
+    with subtest("wg0 listens on its port with the key the host made"):
+        machine.wait_for_unit("wireguard-wg0.service")
+        machine.succeed(
+            '[ "$(wg show wg0 listen-port)" = ${toString wireguard.port} ]',
+            '[ "$(stat -c %U:%a /var/lib/wireguard/wg0.key)" = root:600 ]',
+            '[ "$(wg pubkey < /var/lib/wireguard/wg0.key)" = "$(wg show wg0 public-key)" ]',
+        )
+
+    with subtest("deploy-health fails while wg0 is down"):
+        machine.succeed("systemctl stop wireguard-wg0.service")
+        machine.fail("deploy-health")
+        machine.succeed("systemctl start wireguard-wg0.service", "deploy-health")
+  '';
 }
