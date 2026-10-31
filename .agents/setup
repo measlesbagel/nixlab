@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Warms the Nix store for this flake so agents can run `nix fmt`,
+# `nix flake check` and the dev shell without first downloading everything.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+step() {
+  local name=$1 start
+  shift
+  echo "==> $name"
+  start=$(date +%s)
+  "$@"
+  echo "<== $name ($(($(date +%s) - start))s)"
+}
+
+install_nix() {
+  if [ -x "$HOME/.nix-profile/bin/nix" ]; then
+    return
+  fi
+  curl -fsSL https://nixos.org/nix/install | sh -s -- --no-daemon --yes
+}
+step "install nix" install_nix
+# The installer cannot update this running script's environment.
+# shellcheck disable=SC1091
+source "$HOME/.nix-profile/etc/profile.d/nix.sh"
+
+# Same public caches CI and the hosts use (modules/cache.nix).
+nix_conf="$HOME/.config/nix/nix.conf"
+mkdir -p "$(dirname "$nix_conf")"
+cat >"$nix_conf" <<'EOF'
+experimental-features = nix-command flakes
+extra-substituters = https://measlesbagel.cachix.org
+extra-trusted-public-keys = measlesbagel.cachix.org-1:pDkALnrF/24OQ8Q0ALzdcKqVfOb7zsbizkp77m4RwBE=
+connect-timeout = 5
+max-jobs = auto
+EOF
+
+# changed-hosts reads the base revision through Nix's git fetcher, which
+# rejects shallow clones.
+unshallow() {
+  if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+    git fetch --quiet --unshallow origin
+  fi
+}
+step "unshallow git history" unshallow
+
+step "fetch flake inputs" nix flake archive --no-write-lock-file
+step "build dev shell" bash -c 'nix print-dev-env >/dev/null'
+step "nix fmt" nix fmt -- --ci
+step "nix flake check" nix flake check
+
+# Loads the dev shell into login shells started at the repo root, which is
+# how Amp and supervised orb services start.
+profile_marker="# nixlab Nix development shell"
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >>"$HOME/.bash_profile" <<EOF
+
+$profile_marker
+if [ -z "\${IN_NIX_SHELL:-}" ] && [ "\$PWD" = "$repo_root" ]; then
+  eval "\$("$HOME/.nix-profile/bin/nix" print-dev-env "$repo_root")"
+fi
+EOF
+fi
