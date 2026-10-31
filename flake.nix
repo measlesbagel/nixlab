@@ -285,43 +285,48 @@
               '';
             };
             # Compares committed HEAD only; uncommitted edits are ignored.
+            # Uses the caller's nix: CI's Determinate Nix evaluates in parallel
+            # with lazy trees, which nixpkgs' nix lacks.
             packages.changed-hosts = pkgs.writeShellApplication {
               name = "changed-hosts";
               runtimeInputs = [
-                pkgs.git
+                pkgs.gitMinimal
                 pkgs.jq
-                pkgs.nix
               ];
               text = ''
                 base=$(git rev-parse "''${1:?usage: changed-hosts <base-rev>}")
                 head=$(git rev-parse HEAD)
 
                 # Both sides through the same git fetcher, so identical trees
-                # give identical drvs.
-                drv() { nix eval --raw "git+file://$PWD?rev=$1#nixosConfigurations.$2.config.system.build" --apply "$3"; }
+                # give identical drvs. One eval per side shares nixpkgs across hosts.
+                drvs() { nix eval --json "git+file://$PWD?rev=$1#nixosConfigurations" --apply "$2"; }
 
-                vmTests=" ${toString (lib.attrNames (lib.filterAttrs (_: spec: spec.vmTest or false) hosts))} "
+                # A vmTest host also changes when only its test does.
+                vm='[ ${
+                  lib.concatMapStringsSep " " (h: "\"${h}\"") (
+                    lib.attrNames (lib.filterAttrs (_: spec: spec.vmTest or false) hosts)
+                  )
+                } ]'
 
-                changed=()
-                added=()
-                for host in ${lib.concatStringsSep " " (lib.attrNames hosts)}; do
-                  # A vmTest host also changes when only its test does.
-                  builds="b: b.toplevel.drvPath"
-                  if [[ $vmTests == *" $host "* ]]; then
-                    builds+=" + b.installTest.drvPath"
-                  fi
-                  new=$(drv "$head" "$host" "$builds")
-                  old=$(drv "$base" "$host" "$builds" 2> /dev/null || echo none)
-                  if [ "$new" != "$old" ]; then
-                    changed+=("$host")
-                    if [ "$old" = none ] && ! drv "$base" "$host" "b: b.toplevel.drvPath" > /dev/null 2>&1; then
-                      added+=("$host")
-                    fi
-                  fi
-                done
+                # Head and base evaluate in parallel; eval is single-threaded.
+                tmp=$(mktemp -d)
+                trap 'rm -rf "$tmp"' EXIT
+                drvs "$head" "builtins.mapAttrs (n: c: let b = c.config.system.build; in {
+                  toplevel = b.toplevel.drvPath;
+                  test = if builtins.elem n $vm then b.installTest.drvPath else null;
+                })" > "$tmp/new" &
+                head_eval=$!
+                # What does not evaluate on the base maps to false; tryEval misses
+                # some errors, which fail the whole base instead.
+                old=$(drvs "$base" "builtins.mapAttrs (n: c: let b = c.config.system.build; in {
+                  toplevel = (builtins.tryEval b.toplevel.drvPath).value;
+                  test = if builtins.elem n $vm && b ? installTest then (builtins.tryEval b.installTest.drvPath).value else null;
+                })" 2> /dev/null || echo '{}')
+                wait "$head_eval"
+                new=$(< "$tmp/new")
 
                 # added: no base toplevel, so there is nothing to diff against.
-                jq -cn --argjson hosts '${
+                jq -cn --argjson new "$new" --argjson old "$old" --argjson hosts '${
                   builtins.toJSON (
                     lib.mapAttrs (_: spec: {
                       inherit (spec) system;
@@ -329,8 +334,7 @@
                     }) hosts
                   )
                 }' \
-                  --argjson added "$(printf '%s\n' "''${added[@]}" | jq -Rnc '[inputs | select(. != "")]')" \
-                  '$ARGS.positional | map({host: ., added: (. as $h | $added | index($h) != null)} + $hosts[.])' --args "''${changed[@]}"
+                  '$new | to_entries | map(select(.value != $old[.key]) | {host: .key, added: (($old[.key].toplevel // false) == false)} + $hosts[.key])'
               '';
             };
 
