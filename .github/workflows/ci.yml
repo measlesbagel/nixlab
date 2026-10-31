@@ -78,13 +78,6 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa # v23
-      # Lazy trees keep flake inputs out of the store, so no binary cache has
-      # them: Nix fetches them from GitHub into ~/.cache/nix. cd.yml fills this
-      # on main, where every PR can read it.
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/nix
-          key: flake-inputs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
       - id: changed
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
