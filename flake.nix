@@ -291,26 +291,18 @@
                 head=$(git rev-parse HEAD)
 
                 # Both sides through the same git fetcher, so identical trees
-                # give identical drvs.
-                drv() { nix eval --raw "git+file://$PWD?rev=$1#nixosConfigurations.$2.config.system.build.toplevel.drvPath"; }
+                # give identical drvs. One eval per side shares nixpkgs across hosts.
+                drvs() { nix eval --json "git+file://$PWD?rev=$1#nixosConfigurations" --apply "$2"; }
 
-                changed=()
-                added=()
-                for host in ${lib.concatStringsSep " " (lib.attrNames hosts)}; do
-                  new=$(drv "$head" "$host")
-                  old=$(drv "$base" "$host" 2> /dev/null || echo none)
-                  if [ "$new" != "$old" ]; then
-                    changed+=("$host")
-                    if [ "$old" = none ]; then
-                      added+=("$host")
-                    fi
-                  fi
-                done
+                new=$(drvs "$head" 'builtins.mapAttrs (_: c: c.config.system.build.toplevel.drvPath)')
+                # A base host that does not evaluate maps to false; tryEval misses
+                # some errors, which fail the whole base instead.
+                old=$(drvs "$base" 'builtins.mapAttrs (_: c: (builtins.tryEval c.config.system.build.toplevel.drvPath).value)' 2> /dev/null || echo '{}')
 
                 # added: not evaluable on the base, so there is nothing to diff against.
-                jq -cn --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
-                  --argjson added "$(printf '%s\n' "''${added[@]}" | jq -Rnc '[inputs | select(. != "")]')" \
-                  '$ARGS.positional | map({host: ., system: $systems[.], added: (. as $h | $added | index($h) != null)})' --args "''${changed[@]}"
+                jq -cn --argjson new "$new" --argjson old "$old" \
+                  --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
+                  '$new | to_entries | map(select(.value != $old[.key]) | {host: .key, system: $systems[.key], added: (($old[.key] // false) == false)})'
               '';
             };
 
