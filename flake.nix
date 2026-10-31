@@ -224,6 +224,16 @@
                   inherit lib pkgs;
                   inherit (inputs.self) nixosConfigurations;
                 };
+                # flake check does not evaluate the toplevels itself; reading
+                # drvPath instantiates each one without building it.
+                hosts-evaluate = pkgs.writeText "hosts-evaluate" (
+                  lib.concatMapStrings (
+                    name:
+                    builtins.unsafeDiscardStringContext
+                      inputs.self.nixosConfigurations.${name}.config.system.build.toplevel.drvPath
+                    + "\n"
+                  ) (lib.attrNames hosts)
+                );
               };
 
             packages.kexec-installer =
