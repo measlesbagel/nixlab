@@ -64,6 +64,24 @@ in
     };
   };
 
+  # The first hourly pull starts it; the test cannot wait that long.
+  disko.tests.extraChecks = ''
+    with subtest("albipes makes the syncoid key whose public half is the sources' pullKey"):
+        machine.succeed(
+            "systemctl start ssh-keygen-syncoid.service",
+            "ssh-keygen -l -f ${sshKey}.pub",
+            '[ "$(stat -c %U:%a ${sshKey})" = syncoid:600 ]',
+        )
+
+    with subtest("a replica received unmounted stays unmounted when zfs-mount runs"):
+        machine.succeed(
+            "zfs create -u tank/backups/replica",
+            "systemctl restart zfs-mount.service",
+            '[ "$(zfs get -H -o value mounted tank/backups/replica)" = no ]',
+            "zfs destroy tank/backups/replica",
+        )
+  '';
+
   homelab.zfs.snapshots = lib.listToAttrs (map (r: lib.nameValuePair r.target "replica") replicas);
 
   homelab.reboot.blockers = [ "syncoid-*.service" ];

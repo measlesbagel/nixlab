@@ -58,12 +58,16 @@
           ./modules/ups.nix
           ./modules/cache.nix
           ./modules/comin.nix
+          ./modules/nfs-server.nix
+          ./modules/vm-test.nix
         ];
 
-        # `system` also picks the CI runner that builds the host.
+        # `system` also picks the CI runner that builds the host, and CI boots
+        # each `vmTest` host in a VM (modules/vm-test.nix).
         hosts = {
           seladonia = {
             system = "x86_64-linux";
+            vmTest = true;
             dir = ./hosts/seladonia;
             modules = [
               ./modules/zfs.nix
@@ -79,6 +83,7 @@
           };
           albipes = {
             system = "x86_64-linux";
+            vmTest = true;
             dir = ./hosts/albipes;
             modules = [
               ./modules/zfs.nix
@@ -91,6 +96,7 @@
           };
           chilense = {
             system = "x86_64-linux";
+            vmTest = true;
             dir = ./hosts/chilense;
             modules = [
               ./modules/zfs.nix
@@ -295,21 +301,40 @@
                 # give identical drvs. One eval per side shares nixpkgs across hosts.
                 drvs() { nix eval --json "git+file://$PWD?rev=$1#nixosConfigurations" --apply "$2"; }
 
+                # A vmTest host also changes when only its test does.
+                vm='[ ${
+                  lib.concatMapStringsSep " " (h: "\"${h}\"") (
+                    lib.attrNames (lib.filterAttrs (_: spec: spec.vmTest or false) hosts)
+                  )
+                } ]'
+
                 # Head and base evaluate in parallel; eval is single-threaded.
                 tmp=$(mktemp -d)
                 trap 'rm -rf "$tmp"' EXIT
-                drvs "$head" 'builtins.mapAttrs (_: c: c.config.system.build.toplevel.drvPath)' > "$tmp/new" &
+                drvs "$head" "builtins.mapAttrs (n: c: let b = c.config.system.build; in {
+                  toplevel = b.toplevel.drvPath;
+                  test = if builtins.elem n $vm then b.installTest.drvPath else null;
+                })" > "$tmp/new" &
                 head_eval=$!
-                # A base host that does not evaluate maps to false; tryEval misses
+                # What does not evaluate on the base maps to false; tryEval misses
                 # some errors, which fail the whole base instead.
-                old=$(drvs "$base" 'builtins.mapAttrs (_: c: (builtins.tryEval c.config.system.build.toplevel.drvPath).value)' 2> /dev/null || echo '{}')
+                old=$(drvs "$base" "builtins.mapAttrs (n: c: let b = c.config.system.build; in {
+                  toplevel = (builtins.tryEval b.toplevel.drvPath).value;
+                  test = if builtins.elem n $vm && b ? installTest then (builtins.tryEval b.installTest.drvPath).value else null;
+                })" 2> /dev/null || echo '{}')
                 wait "$head_eval"
                 new=$(< "$tmp/new")
 
-                # added: not evaluable on the base, so there is nothing to diff against.
-                jq -cn --argjson new "$new" --argjson old "$old" \
-                  --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
-                  '$new | to_entries | map(select(.value != $old[.key]) | {host: .key, system: $systems[.key], added: (($old[.key] // false) == false)})'
+                # added: no base toplevel, so there is nothing to diff against.
+                jq -cn --argjson new "$new" --argjson old "$old" --argjson hosts '${
+                  builtins.toJSON (
+                    lib.mapAttrs (_: spec: {
+                      inherit (spec) system;
+                      vmTest = spec.vmTest or false;
+                    }) hosts
+                  )
+                }' \
+                  '$new | to_entries | map(select(.value != $old[.key]) | {host: .key, added: (($old[.key].toplevel // false) == false)} + $hosts[.key])'
               '';
             };
 

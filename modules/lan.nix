@@ -6,6 +6,7 @@
 }:
 let
   inherit (config.homelab) lan wireguard nodes;
+  routesViaEndpoint = config.networking.hostName != wireguard.endpoint;
 in
 {
   options.homelab.lan.uplinkDrivers = lib.mkOption {
@@ -43,7 +44,7 @@ in
 
     # Replies to WireGuard peers go back through the endpoint, not the router,
     # so the firewall can tell a peer's address from the endpoint's.
-    systemd.services.wireguard-route = lib.mkIf (config.networking.hostName != wireguard.endpoint) {
+    systemd.services.wireguard-route = lib.mkIf routesViaEndpoint {
       description = "Route the WireGuard subnet through its endpoint";
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" ];
@@ -57,6 +58,10 @@ in
         Restart = "on-failure";
         RestartSec = 10;
       };
+    };
+
+    homelab.vmTest.unverifiable = lib.mkIf routesViaEndpoint {
+      "wireguard-route.service" = "needs the LAN gateway";
     };
   };
 }

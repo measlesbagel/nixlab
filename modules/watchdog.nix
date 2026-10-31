@@ -190,5 +190,23 @@ in
         ExecStart = lib.getExe bootGate;
       };
     };
+
+    # The test driver talks over a virtio console, not SSH, so sshd can stop.
+    disko.tests.extraChecks = ''
+      with subtest("the boot gate confirms a healthy first boot"):
+          machine.wait_for_unit("deploy-watchdog.service")
+          machine.succeed(
+              '[ "$(cat ${stateDir}/confirmed)" = "$(readlink -f /run/current-system)" ]',
+              '[ "$(readlink -f /nix/var/nix/gcroots/deploy-confirmed)" = "$(readlink -f /run/current-system)" ]',
+          )
+
+      with subtest("deploy-confirm records nothing while deploy-health fails"):
+          machine.succeed("rm ${stateDir}/confirmed", "systemctl stop sshd.service")
+          machine.fail("deploy-health")
+          machine.fail("deploy-confirm")
+          machine.succeed("systemctl start sshd.service", "test ! -e ${stateDir}/confirmed")
+          machine.succeed("deploy-confirm")
+          machine.succeed('[ "$(cat ${stateDir}/confirmed)" = "$(readlink -f /run/current-system)" ]')
+    '';
   };
 }

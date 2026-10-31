@@ -2,6 +2,7 @@
 let
   inherit (lib) mkOption types;
   cfg = config.homelab.zfs;
+  autosnapped = lib.attrNames (lib.filterAttrs (_: class: class != "replica") cfg.snapshots);
 in
 {
   options.homelab.zfs.snapshots = mkOption {
@@ -56,4 +57,12 @@ in
 
     datasets = lib.mapAttrs (_: class: { useTemplate = [ class ]; }) cfg.snapshots;
   };
+
+  config.disko.tests.extraChecks = lib.mkIf (cfg.snapshots != { }) ''
+    with subtest("sanoid snapshots the state and bulk datasets, and nothing else"):
+        machine.succeed("systemctl start --wait sanoid.service")
+        snapshots = machine.succeed("zfs list -H -t snapshot -o name").split()
+        snapshotted = sorted({s.split("@")[0] for s in snapshots if "@autosnap_" in s})
+        assert snapshotted == ${builtins.toJSON autosnapped}, snapshotted
+  '';
 }

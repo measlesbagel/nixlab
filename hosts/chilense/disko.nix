@@ -43,14 +43,17 @@
         "local/root" = {
           type = "zfs_fs";
           mountpoint = "/";
+          options.mountpoint = "legacy";
         };
         "local/nix" = {
           type = "zfs_fs";
           mountpoint = "/nix";
+          options.mountpoint = "legacy";
         };
         "safe/home" = {
           type = "zfs_fs";
           mountpoint = "/home";
+          options.mountpoint = "legacy";
         };
       };
     };
