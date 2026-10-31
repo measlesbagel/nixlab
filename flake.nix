@@ -282,7 +282,7 @@
             packages.changed-hosts = pkgs.writeShellApplication {
               name = "changed-hosts";
               runtimeInputs = [
-                pkgs.git
+                pkgs.gitMinimal
                 pkgs.jq
                 pkgs.nix
               ];
@@ -294,10 +294,16 @@
                 # give identical drvs. One eval per side shares nixpkgs across hosts.
                 drvs() { nix eval --json "git+file://$PWD?rev=$1#nixosConfigurations" --apply "$2"; }
 
-                new=$(drvs "$head" 'builtins.mapAttrs (_: c: c.config.system.build.toplevel.drvPath)')
+                # Head and base evaluate in parallel; eval is single-threaded.
+                tmp=$(mktemp -d)
+                trap 'rm -rf "$tmp"' EXIT
+                drvs "$head" 'builtins.mapAttrs (_: c: c.config.system.build.toplevel.drvPath)' > "$tmp/new" &
+                head_eval=$!
                 # A base host that does not evaluate maps to false; tryEval misses
                 # some errors, which fail the whole base instead.
                 old=$(drvs "$base" 'builtins.mapAttrs (_: c: (builtins.tryEval c.config.system.build.toplevel.drvPath).value)' 2> /dev/null || echo '{}')
+                wait "$head_eval"
+                new=$(< "$tmp/new")
 
                 # added: not evaluable on the base, so there is nothing to diff against.
                 jq -cn --argjson new "$new" --argjson old "$old" \
