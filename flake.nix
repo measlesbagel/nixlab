@@ -279,38 +279,37 @@
               '';
             };
             # Compares committed HEAD only; uncommitted edits are ignored.
+            # Uses the caller's nix: CI's Determinate Nix evaluates in parallel
+            # with lazy trees, which nixpkgs' nix lacks.
             packages.changed-hosts = pkgs.writeShellApplication {
               name = "changed-hosts";
               runtimeInputs = [
-                pkgs.git
+                pkgs.gitMinimal
                 pkgs.jq
-                pkgs.nix
               ];
               text = ''
                 base=$(git rev-parse "''${1:?usage: changed-hosts <base-rev>}")
                 head=$(git rev-parse HEAD)
 
                 # Both sides through the same git fetcher, so identical trees
-                # give identical drvs.
-                drv() { nix eval --raw "git+file://$PWD?rev=$1#nixosConfigurations.$2.config.system.build.toplevel.drvPath"; }
+                # give identical drvs. One eval per side shares nixpkgs across hosts.
+                drvs() { nix eval --json "git+file://$PWD?rev=$1#nixosConfigurations" --apply "$2"; }
 
-                changed=()
-                added=()
-                for host in ${lib.concatStringsSep " " (lib.attrNames hosts)}; do
-                  new=$(drv "$head" "$host")
-                  old=$(drv "$base" "$host" 2> /dev/null || echo none)
-                  if [ "$new" != "$old" ]; then
-                    changed+=("$host")
-                    if [ "$old" = none ]; then
-                      added+=("$host")
-                    fi
-                  fi
-                done
+                # Head and base evaluate in parallel; eval is single-threaded.
+                tmp=$(mktemp -d)
+                trap 'rm -rf "$tmp"' EXIT
+                drvs "$head" 'builtins.mapAttrs (_: c: c.config.system.build.toplevel.drvPath)' > "$tmp/new" &
+                head_eval=$!
+                # A base host that does not evaluate maps to false; tryEval misses
+                # some errors, which fail the whole base instead.
+                old=$(drvs "$base" 'builtins.mapAttrs (_: c: (builtins.tryEval c.config.system.build.toplevel.drvPath).value)' 2> /dev/null || echo '{}')
+                wait "$head_eval"
+                new=$(< "$tmp/new")
 
                 # added: not evaluable on the base, so there is nothing to diff against.
-                jq -cn --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
-                  --argjson added "$(printf '%s\n' "''${added[@]}" | jq -Rnc '[inputs | select(. != "")]')" \
-                  '$ARGS.positional | map({host: ., system: $systems[.], added: (. as $h | $added | index($h) != null)})' --args "''${changed[@]}"
+                jq -cn --argjson new "$new" --argjson old "$old" \
+                  --argjson systems '${builtins.toJSON (lib.mapAttrs (_: spec: spec.system) hosts)}' \
+                  '$new | to_entries | map(select(.value != $old[.key]) | {host: .key, system: $systems[.key], added: (($old[.key] // false) == false)})'
               '';
             };
 

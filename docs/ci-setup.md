@@ -18,11 +18,13 @@ through the weekly flake.lock PR, to this repository.
    pins them by SHA). SHA pinning required; approval for every outside
    contributor's run; a read-only default token that cannot approve PRs.
 3. Ruleset `main`: require a pull request with code-owner review and the
-   `Secret scan`, `Workflow lint`, `Flake check`, `Commit format` and
-   `Flake lock` status checks; block force pushes and deletion; repository
-   admins bypass. (`Build <host>` exists only for changed hosts, so it cannot
-   be required by name.) `.github/CODEOWNERS` makes the owner review every PR,
-   so agent accounts cannot merge their own. Pull requests merge by squash
+   `Secret scan`, `Workflow lint`, `Flake check`, `Commit format`,
+   `Flake lock` and `Find changed hosts` status checks; block force pushes
+   and deletion; repository admins bypass. (`Build <host>` exists only for
+   changed hosts, so it cannot be required by name; `Find changed hosts`
+   evaluates every host and, when it fails, skips the builds.)
+   `.github/CODEOWNERS` makes the owner review every PR, so agent accounts
+   cannot merge their own. Pull requests merge by squash
    only, with the PR title as the commit subject (Settings > General > Pull
    Requests). This ruleset is the deploy gate: every host applies whatever
    lands on `main`, provided GitHub signed the tip commit
