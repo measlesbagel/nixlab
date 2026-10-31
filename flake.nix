@@ -279,12 +279,13 @@
               '';
             };
             # Compares committed HEAD only; uncommitted edits are ignored.
+            # Uses the caller's nix: CI's Determinate Nix evaluates in parallel
+            # with lazy trees, which nixpkgs' nix lacks.
             packages.changed-hosts = pkgs.writeShellApplication {
               name = "changed-hosts";
               runtimeInputs = [
                 pkgs.gitMinimal
                 pkgs.jq
-                pkgs.nix
               ];
               text = ''
                 base=$(git rev-parse "''${1:?usage: changed-hosts <base-rev>}")
