@@ -88,7 +88,7 @@ How the push works:
   therefore read the token and upload a path that a host then installs, without
   the code-owner review that gates `main`. Revoke the token in the cache's
   settings if in doubt. To close the gap, keep the secret in a GitHub
-  Environment with required reviewers, or push only from `cd.yml` on `main`.
+  Environment with required reviewers, or push only from a workflow on `main`.
 - The first run with a token must not log that the user is "not allowed to set
   the post-build-hook". The action then falls back to scanning the store, which
   also uploads substituted paths.
