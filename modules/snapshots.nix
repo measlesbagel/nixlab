@@ -2,6 +2,7 @@
 let
   inherit (lib) mkOption types;
   cfg = config.homelab.snapshots;
+  inherit (config.homelab) replicate replication;
 
   # btrbk keeps hourlies for 24h and dailies for the given span.
   classes = {
@@ -20,7 +21,11 @@ let
     lib.foldlAttrs (
       acc: path: c:
       if c == class then
-        lib.recursiveUpdate acc { ${dirOf path}.subvolume.${baseNameOf path} = { }; }
+        lib.recursiveUpdate acc {
+          ${dirOf path}.subvolume.${baseNameOf path} = lib.optionalAttrs (lib.elem path replicate) {
+            snapshot_dir = replication.snapshotDir;
+          };
+        }
       else
         acc
     ) { } cfg;
@@ -40,7 +45,8 @@ in
     description = ''
       btrfs subvolume to policy class, each given as its path under the
       filesystem's top-level mount; snapshots land in that mount's
-      `@snapshots`. `state` is irreplaceable service data; `bulk` is large,
+      `@snapshots`, those of `homelab.replicate` in a directory of their own
+      (modules/replication.nix). `state` is irreplaceable service data; `bulk` is large,
       mostly append-only data where only deletions cost space. Nothing is kept
       beyond two weeks.
     '';

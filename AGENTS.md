@@ -34,7 +34,7 @@ Rules for AI/agent sessions in this repo.
 - Public repo: IPs and hostnames are fine to commit; nothing else sensitive.
 - Commit subjects and PR titles are Conventional Commits:
   `<type>(<scope>): <imperative summary>`, type one of feat, fix, docs, style,
-  refactor, perf, test, build, ci, chore or revert; an area like `zfs` is a
+  refactor, perf, test, build, ci, chore or revert; an area like `storage` is a
   scope, not a type. PRs land squashed under their title, and
   `.github/workflows/commits.yml` checks both.
 - Hosts deploy themselves (comin); CI never reaches the lab. It pushes what

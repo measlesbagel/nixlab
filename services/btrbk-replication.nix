@@ -10,24 +10,32 @@ let
     "chilense"
   ];
   sshKey = "/var/lib/btrbk/.ssh/id_ed25519";
+  backups = "/tank/backups";
 
   volumes = lib.foldl' lib.recursiveUpdate { } (
     lib.concatMap (
       host:
+      let
+        inherit (inputs.self.nixosConfigurations.${host}.config.homelab) replicate replication;
+      in
       map (path: {
-        "ssh://${host}${dirOf path}".subvolume.${baseNameOf path}.target = "/tank/backups/${host}";
-      }) inputs.self.nixosConfigurations.${host}.config.homelab.replicate
+        "ssh://${host}${dirOf path}".subvolume.${baseNameOf path} = {
+          snapshot_dir = replication.snapshotDir;
+          target = "${backups}/${host}";
+        };
+      }) replicate
     ) sources
   );
 in
 {
   services.btrbk.instances.replication = {
-    onCalendar = "hourly";
+    # After the sources' hourly snapshots, which may start up to 10 minutes
+    # late (AccuracySec in the btrbk module).
+    onCalendar = "*:20";
     settings = {
       ssh_identity = sshKey;
       ssh_user = "btrbk";
       timestamp_format = "long";
-      snapshot_dir = "@snapshots";
       # The sources snapshot and prune on their own (modules/snapshots.nix).
       snapshot_create = "no";
       snapshot_preserve_min = "all";
@@ -38,7 +46,7 @@ in
     };
   };
 
-  systemd.tmpfiles.rules = map (host: "d /tank/backups/${host} 0750 root root") sources;
+  systemd.tmpfiles.rules = map (host: "d ${backups}/${host} 0750 root root") sources;
 
   # Made here and never copied anywhere; only its public half is committed.
   # Named off btrbk-* so it never counts as a reboot blocker.
@@ -63,5 +71,8 @@ in
   systemd.services.btrbk-replication = {
     requires = [ "ssh-keygen-btrbk.service" ];
     after = [ "ssh-keygen-btrbk.service" ];
+    # tank is nofail (hosts/albipes/disko.nix); without it this would receive
+    # onto the OS disk.
+    unitConfig.RequiresMountsFor = [ backups ];
   };
 }

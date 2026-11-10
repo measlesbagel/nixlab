@@ -16,6 +16,8 @@ in
   # uid differs between hosts.
   systemd.tmpfiles.rules = [ "d ${root} 0755 root root -" ];
 
+  systemd.services.nfs-server.unitConfig.RequiresMountsFor = [ root ];
+
   services.nfs.server = {
     enable = true;
     exports = lib.concatMapStrings (

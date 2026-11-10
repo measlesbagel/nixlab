@@ -8,7 +8,7 @@ in
     settings = {
       Address = "127.0.0.1";
       MusicFolder = "/media/music";
-      # Keep the regenerable cache off the snapshotted state dataset.
+      # Keep the regenerable cache off the snapshotted state subvolume.
       CacheFolder = "/var/cache/navidrome";
     };
   };

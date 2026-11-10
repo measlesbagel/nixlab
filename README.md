@@ -78,6 +78,18 @@ pulls those in `homelab.replicate` with btrbk, and restic ships the
 postgres dump to RustFS. Everything is kept for two weeks. The Sparks hold
 nothing to back up.
 
+If a `tank` drive dies, albipes still boots, without `/tank`, and what
+needs it stays down. Mount what is left, then swap the drive in
+(`btrfs filesystem show` gives the missing devid):
+
+```console
+sudo mount -o degraded /dev/disk/by-partlabel/disk-data-b-btrfs /mnt/tank
+sudo btrfs replace start <devid> /dev/disk/by-id/<new drive> /mnt/tank
+```
+
+Use `disk-data-a-btrfs` if data-b is the dead one, and reboot once the
+replace is done to bring `/tank` back.
+
 ## Power
 
 Every host is on one UPS, driven by albipes. At low battery they all shut

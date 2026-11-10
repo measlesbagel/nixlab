@@ -4,6 +4,13 @@ let
     "compress=zstd"
     "noatime"
   ];
+  # RAID1 does not mount with a drive missing; without nofail that boot stops
+  # in emergency mode, before sshd. Whatever writes here needs
+  # RequiresMountsFor, or it lands on the OS disk.
+  tankMountOptions = mountOptions ++ [
+    "nofail"
+    "x-systemd.device-timeout=30s"
+  ];
 in
 {
   disko.devices.disk = {
@@ -73,23 +80,23 @@ in
             ];
             # Top level, for btrbk (modules/snapshots.nix).
             mountpoint = "/mnt/tank";
-            inherit mountOptions;
+            mountOptions = tankMountOptions;
             subvolumes = {
               "@media" = {
                 mountpoint = "/tank/media";
-                inherit mountOptions;
+                mountOptions = tankMountOptions;
               };
               "@backups" = {
                 mountpoint = "/tank/backups";
-                inherit mountOptions;
+                mountOptions = tankMountOptions;
               };
               "@objects" = {
                 mountpoint = "/tank/objects";
-                inherit mountOptions;
+                mountOptions = tankMountOptions;
               };
               "@models" = {
                 mountpoint = "/tank/models";
-                inherit mountOptions;
+                mountOptions = tankMountOptions;
               };
               "@snapshots" = { };
             };
