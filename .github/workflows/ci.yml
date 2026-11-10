@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+      - uses: zizmorcore/zizmor-action@45d7276c9ca790aabd705e31ca99c6185c3e76dd # v0.8.1
         with:
           persona: pedantic
           # Uploading SARIF needs security-events: write; fail in the log instead.
@@ -130,7 +130,7 @@ jobs:
             body=$(gh api "$url" --jq .body)
             gh api --method PATCH "$url" -f "body=$marker"$'\n'"${body#*$'\n'}" > /dev/null
           fi
-      - uses: natsukium/nix-diff-action@4091452e4c7b3c7ea4ecbaec84be7f0066d810d7 # v1.1.1
+      - uses: natsukium/nix-diff-action@98f606826342376a063160500a3ebf8664d933e9 # v1.2.1
         with:
           attributes: ${{ needs.changed.outputs.attributes }}
           comment-strategy: update
