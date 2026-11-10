@@ -49,7 +49,7 @@ let
   everyone = [
     "measles"
     "deploy"
-    "syncoid"
+    "btrbk"
     "root"
   ];
 
@@ -65,7 +65,7 @@ let
         "deploy"
       ];
       deny = [
-        "syncoid"
+        "btrbk"
         "root"
       ];
     }
@@ -77,7 +77,7 @@ let
         "deploy"
       ];
       deny = [
-        "syncoid"
+        "btrbk"
         "root"
       ];
     }
@@ -87,7 +87,7 @@ let
         "typhochlaena"
         "homoeomma"
       ];
-      accept = [ "syncoid" ];
+      accept = [ "btrbk" ];
       deny = [
         "measles"
         "deploy"

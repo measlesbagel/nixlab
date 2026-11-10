@@ -8,13 +8,12 @@
   ];
 
   networking.hostName = "albipes";
-  networking.hostId = "8425e349";
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  homelab.zfs.snapshots = {
-    "tank/objects" = "state";
-    "tank/media" = "bulk";
+  homelab.snapshots = {
+    "/mnt/tank/@objects" = "state";
+    "/mnt/tank/@media" = "bulk";
   };
 }

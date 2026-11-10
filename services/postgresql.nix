@@ -32,6 +32,11 @@ in
       backupAll = true;
     };
 
+    # No copy-on-write for the data files: on btrfs it fragments them badly.
+    # That also drops btrfs checksums there; PostgreSQL 18's initdb turns on
+    # its own data checksums.
+    systemd.tmpfiles.rules = [ "h ${dirOf config.services.postgresql.dataDir} - - - - +C" ];
+
     homelab.backup.paths = [ "/var/backup/postgresql" ];
     homelab.reboot.blockers = [ "postgresqlBackup.service" ];
 
