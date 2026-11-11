@@ -48,10 +48,7 @@ in
 
   # The NVIDIA driver comes from this set too.
   boot.kernelPackages = lib.mkForce upstreamKernel;
-  # And upstream's finished driver with it: the module scrubs the kernel
-  # module with our pkgs.removeReferencesTo, so its own driver differs from
-  # the cached one. Building that needs the kernel's dev output, which no
-  # cache holds, and so a full kernel build on every nixpkgs bump.
+  # Upstream's cached driver; the module's own would rebuild the kernel.
   hardware.nvidia.package = lib.mkForce upstream.config.hardware.nvidia.package;
   # The driver's libraries load into our processes, which cannot provide
   # symbols from a newer glibc.
