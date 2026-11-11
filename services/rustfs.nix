@@ -8,6 +8,16 @@ in
 {
   services.rustfs = {
     enable = true;
+    # rustfs 1.0.4's aws-lc-sys is built with AWS_LC_SYS_USE_SYSTEM=1 but
+    # nixpkgs gives it no aws-lc, so the build fails. nixpkgs master adds
+    # pkg-config, zstd and aws-lc (with rustfs 1.0.5); drop this once that lands.
+    package = pkgs.rustfs.overrideAttrs (old: {
+      nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.pkg-config ];
+      buildInputs = (old.buildInputs or [ ]) ++ [
+        pkgs.zstd
+        pkgs.aws-lc
+      ];
+    });
     environmentFile = "/var/lib/opnix/secrets/rustfsResticEnv";
     settings = {
       RUSTFS_VOLUMES = storage;
