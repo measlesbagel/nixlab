@@ -9,7 +9,8 @@
 let
   # Built by upstream's own nixpkgs, as its full builds push it to
   # graham33.cachix.org; the rest of the system stays on ours.
-  upstreamKernel = inputs.nixos-dgx-spark.nixosConfigurations.dgx-spark.config.boot.kernelPackages;
+  upstream = inputs.nixos-dgx-spark.nixosConfigurations.dgx-spark;
+  upstreamKernel = upstream.config.boot.kernelPackages;
 
   # In a memory-pressure livelock PID 1 still pets RuntimeWatchdogSec, so this
   # pets the hardware watchdog only while fork/exec still works.
@@ -47,6 +48,8 @@ in
 
   # The NVIDIA driver comes from this set too.
   boot.kernelPackages = lib.mkForce upstreamKernel;
+  # Upstream's cached driver; the module's own would rebuild the kernel.
+  hardware.nvidia.package = lib.mkForce upstream.config.hardware.nvidia.package;
   # The driver's libraries load into our processes, which cannot provide
   # symbols from a newer glibc.
   assertions = [
