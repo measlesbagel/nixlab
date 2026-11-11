@@ -47,6 +47,7 @@
         commonModules = [
           ./modules/topology.nix
           ./modules/base.nix
+          ./modules/kernel.nix
           ./modules/lan.nix
           ./modules/ssh.nix
           ./modules/opnix.nix
@@ -66,7 +67,7 @@
             system = "x86_64-linux";
             dir = ./hosts/seladonia;
             modules = [
-              ./modules/zfs.nix
+              ./modules/btrfs.nix
               ./services/caddy.nix
               ./services/ddns.nix
               ./services/pocket-id.nix
@@ -81,9 +82,9 @@
             system = "x86_64-linux";
             dir = ./hosts/albipes;
             modules = [
-              ./modules/zfs.nix
+              ./modules/btrfs.nix
               ./services/smartd.nix
-              ./services/zfs-replication.nix
+              ./services/btrbk-replication.nix
               ./services/rustfs.nix
               ./services/model-library.nix
               ./services/music-share.nix
@@ -93,7 +94,7 @@
             system = "x86_64-linux";
             dir = ./hosts/chilense;
             modules = [
-              ./modules/zfs.nix
+              ./modules/btrfs.nix
               inputs.hjem.nixosModules.default
               inputs.nix-rtl8159.nixosModules.default
               ./services/model-sync.nix

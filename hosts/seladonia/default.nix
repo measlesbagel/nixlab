@@ -8,24 +8,20 @@
   ];
 
   networking.hostName = "seladonia";
-  networking.hostId = "9242acfc";
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  homelab.zfs.snapshots = {
-    "rpool/safe/var-lib" = "state";
-    "rpool/safe/navidrome" = "state";
-    "rpool/safe/postgres" = "state";
+  homelab.snapshots = {
+    "/mnt/btr_pool/@var-lib" = "state";
+    "/mnt/btr_pool/@navidrome" = "state";
+    "/mnt/btr_pool/@postgres" = "state";
   };
 
-  homelab.zfs.replicate = [
-    "rpool/safe/navidrome"
-    "rpool/safe/postgres"
+  homelab.replicate = [
+    "/mnt/btr_pool/@navidrome"
+    "/mnt/btr_pool/@postgres"
   ];
-
-  # Leave RAM for postgres and services; ARC otherwise takes up to half.
-  boot.kernelParams = [ "zfs.zfs_arc_max=${toString (8 * 1024 * 1024 * 1024)}" ];
 
   virtualisation.vmVariant = {
     users.users.root.initialPassword = "vm";

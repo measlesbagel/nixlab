@@ -19,7 +19,7 @@ Bare-metal NixOS homelab monorepo, the public source of truth for the fleet.
 | Host | Role |
 | --- | --- |
 | seladonia | mini PC — services plane (edge, postgres, media apps) |
-| albipes | NAS — ZFS, NFS (music, models), RustFS S3 |
+| albipes | NAS — btrfs RAID1, NFS (music, models), RustFS S3 |
 | chilense | desktop — personal computer, dev env, RTX 4090 |
 | leetzi, elegans | Asus GX10 (GB10, aarch64) inference nodes |
 
@@ -72,10 +72,23 @@ One library on albipes, local copies on the hosts that run them:
 
 ## Storage
 
-sanoid snapshots the datasets in `homelab.zfs.snapshots`, albipes pulls
-those in `homelab.zfs.replicate` with `syncoid`, and restic ships the
+Every host but the Sparks is on btrfs, albipes's `tank` as RAID1 over
+both drives. btrbk snapshots the subvolumes in `homelab.snapshots`, albipes
+pulls those in `homelab.replicate` with btrbk, and restic ships the
 postgres dump to RustFS. Everything is kept for two weeks. The Sparks hold
 nothing to back up.
+
+If a `tank` drive dies, albipes still boots, without `/tank`, and what
+needs it stays down. Mount what is left, then swap the drive in
+(`btrfs filesystem show` gives the missing devid):
+
+```console
+sudo mount -o degraded /dev/disk/by-partlabel/disk-data-b-btrfs /mnt/tank
+sudo btrfs replace start <devid> /dev/disk/by-id/<new drive> /mnt/tank
+```
+
+Use `disk-data-a-btrfs` if data-b is the dead one, and reboot once the
+replace is done to bring `/tank` back.
 
 ## Power
 

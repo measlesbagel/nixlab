@@ -1,4 +1,4 @@
-# restic target for every host. tank/objects is snapshotted, so backups a host
+# restic target for every host. /tank/objects is snapshotted, so backups a host
 # deletes (or has deleted for it) can still be rolled back.
 { pkgs, ... }:
 let

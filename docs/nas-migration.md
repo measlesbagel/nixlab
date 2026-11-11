@@ -1,8 +1,8 @@
 # Moving albipes off UGOS
 
 Provisioning albipes formats both 18 TB drives (`tank` in
-`hosts/albipes/disko.nix`), and UGOS's btrfs-on-LVM volume cannot be
-imported as ZFS. Only the music library comes back; the UGOS apps (lidarr,
+`hosts/albipes/disko.nix`); UGOS's btrfs-on-LVM volume is not carried
+over. Only the music library comes back; the UGOS apps (lidarr,
 slskd, beets, matrix) are rebuilt from scratch, their data left behind.
 
 The copy taken in July 2026 lives on chilense at
@@ -49,10 +49,10 @@ A checksum comparison must list nothing:
 
 ```console
 rsync -rnc --itemize-changes --rsync-path='sudo rsync' payload/media/music/ deploy@albipes:/tank/media/music/
-ssh deploy@albipes 'sudo zfs snapshot tank/media@ugos-restore'
+ssh deploy@albipes 'sudo btrfs subvolume snapshot -r /mnt/tank/@media /mnt/tank/@snapshots/media.ugos-restore'
 ```
 
-The manual snapshot is outside sanoid's retention, so it stays until deleted
+btrbk only prunes the snapshots it named, so this one stays until deleted
 by hand.
 
 ## 5. Only then: chilense

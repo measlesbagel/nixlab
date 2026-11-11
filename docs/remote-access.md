@@ -23,11 +23,11 @@ How you reach the lab and log in to it.
 | User | From | Hosts |
 | --- | --- | --- |
 | `measles`, `deploy` | WireGuard peers, *Homoeomma* (chilense) | all |
-| `syncoid` | *Hapalotremus* (albipes) | seladonia, chilense |
+| `btrbk` | *Hapalotremus* (albipes) | seladonia, chilense |
 | `nix-builder` | leetzi, on the Spark link | elegans |
 
 Logins name their sources by host, genus ([taxonomy.md](taxonomy.md)) or
-address, e.g. `homelab.ssh.logins.syncoid = [ "hapalotremus" ]`; sshd and
+address, e.g. `homelab.ssh.logins.btrbk = [ "hapalotremus" ]`; sshd and
 nftables get the addresses from topology. Each port 22 rule carries the
 names as its comment.
 
@@ -92,9 +92,9 @@ Do these in order; each step is safe to merge on its own.
 
    Lab hosts route `10.100.0.0/24` back through seladonia themselves
    (`modules/lan.nix`); other LAN devices see seladonia's address.
-5. **syncoid.** albipes makes its own key on the next deploy. Commit
-   `ssh deploy@albipes cat /var/lib/syncoid/.ssh/id_ed25519.pub` as
-   `homelab.zfs.pullKey` in `modules/replication.nix`; replication starts on
+5. **btrbk.** albipes makes its own key on the next deploy. Commit
+   `ssh deploy@albipes cat /var/lib/btrbk/.ssh/id_ed25519.pub` as
+   `homelab.replication.pullKey` in `modules/replication.nix`; replication starts on
    the deploy after.
 6. **Host keys.** Commit each host's `/etc/ssh/ssh_host_ed25519_key.pub` as
    its `sshHostKey`, so hosts and deploys check it. `provision` prints it
