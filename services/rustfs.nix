@@ -17,6 +17,11 @@ in
         pkgs.zstd
         pkgs.aws-lc
       ];
+      # Upstream's release profile builds with codegen-units = 1, and rustc
+      # runs out of memory on the main crate on a 16 GB CI runner.
+      env = old.env // {
+        CARGO_PROFILE_RELEASE_CODEGEN_UNITS = "16";
+      };
     });
     environmentFile = "/var/lib/opnix/secrets/rustfsResticEnv";
     settings = {
