@@ -126,6 +126,8 @@ in
       services = [ "model-library-sync" ];
     };
 
+    systemd.services.nfs-server.unitConfig.RequiresMountsFor = [ root ];
+
     # Weights are not secret: world-readable, root squashed.
     services.nfs.server = {
       enable = true;

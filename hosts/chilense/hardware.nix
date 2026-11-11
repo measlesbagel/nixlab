@@ -24,8 +24,7 @@
   # USB autosuspend kept dropping the RTL8159 and Bluetooth until a reboot.
   boot.kernelParams = [ "usbcore.autosuspend=-1" ];
 
-  # The in-tree r8152 only reaches 10G on the RTL8159 with this PHY firmware.
-  # Its kernel >= 7.2 assertion matters: the kernel picker falls back below
-  # 7.2 if nixpkgs drops it before ZFS supports anything newer.
+  # The in-tree r8152 only reaches 10G on the RTL8159 with this PHY firmware,
+  # from kernel 7.2 on (the module asserts it).
   hardware.rtl8159.enable = true;
 }

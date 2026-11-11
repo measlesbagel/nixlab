@@ -9,13 +9,12 @@
   ];
 
   networking.hostName = "chilense";
-  networking.hostId = "224a7262";
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  homelab.zfs.snapshots."rpool/safe/home" = "state";
-  homelab.zfs.replicate = [ "rpool/safe/home" ];
+  homelab.snapshots."/mnt/btr_pool/@home" = "state";
+  homelab.replicate = [ "/mnt/btr_pool/@home" ];
 
   hjem = {
     extraModules = [ inputs.hjem-rum.hjemModules.default ];

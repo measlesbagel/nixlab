@@ -26,7 +26,6 @@
             randomEncryption = true;
           };
         };
-        # Not ZFS: the ARC would compete with the GPU for the 128 GB pool.
         root = {
           size = "100%";
           content = {
