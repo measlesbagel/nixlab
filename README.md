@@ -9,7 +9,8 @@ Bare-metal NixOS homelab monorepo, the public source of truth for the fleet.
 - `services/`: one file per feature, owning its service, routes, backups and
   monitoring
 - `home/measles/`: personal hjem config (hjem-rum modules)
-- `installer/`, `scripts/`: the kexec installer and `provision`
+- `installer/`, `scripts/`: the kexec installer, `provision` and a boot-test
+  helper
 - `secrets/`: secret contracts; never values
 - `tests/`: evaluation checks run by `nix flake check`
 - `.github/workflows/`: CI/CD
@@ -46,13 +47,53 @@ comin confirms only once the host passes `deploy-health` and can still reach
 GitHub. Hosts reboot into a new kernel by themselves at night, once idle
 (`modules/reboot.nix`).
 
-PRs run `ci.yml` (checks and a build of each changed host) and keep one
-comment with each changed host's closure diff against the base
+PRs run `ci.yml` (checks, a build of each changed host and a boot test of
+each changed x86_64 host) and keep one comment with each changed host's
+closure diff against the base
 ([nix-diff-action](https://github.com/natsukium/nix-diff-action), comparing
 `.drv` files, so nothing builds twice). The sizes in it are `.drv` closures,
 not runtime closures, and the action also uploads the full diff as a workflow
 artifact. A same-repo PR also pushes what it built to the Cachix cache.
 One-time setup: [docs/ci-setup.md](docs/ci-setup.md).
+
+## Boot tests
+
+A host's boot test is disko's `installTest`. It formats scratch disks from
+the host's disko layout, sets the system profile and installs the bootloader
+on them, boots that under KVM and runs the checks that the host's modules add
+to `homelab.vmTest.checks` (`modules/vm-test.nix`).
+
+What boots is the host's own configuration plus NixOS's test instrumentation,
+on disks named `/dev/vdX`, with 1 GiB of RAM, fixed by disko. `/nix/store` is
+shared from the build machine and `nixos-install` never runs, so the test
+does not show that the closure copies onto the disk or fits there. The VM has
+no LAN, internet, 1Password token, GPU, 10GbE uplink, UPS or SMART data.
+comin runs in it as on the host, and only the Nix build sandbox keeps it from
+pulling `main`, so keep the sandbox on.
+
+The last check fails the test when the boot does not finish, or when a unit
+has failed, is restarting, was restarted by its own `Restart=`, or was skipped
+because a dependency failed. Units in `homelab.vmTest.unverifiable` are
+excused because they need what the VM lacks, which includes every service
+that reads a 1Password secret. The test log lists each as `not verified`, and
+nothing about them is tested. The check also cannot see:
+
+- a daemon whose parent exits 0 while its child dies, as `rpc.mountd` did
+  (`modules/nfs-server.nix` checks that one itself);
+- the restarts of a unit that a check started by hand, which resets the
+  count;
+- a unit skipped for a failed dependency before journald was up, in the
+  initrd or just after it, as only the journal records a skip;
+- what a timer would start: the test stops every timer so that the time of
+  day cannot change its result, and a check starts what it tests.
+
+CI runs it for each changed host marked `vmTest` in `flake.nix`, also when
+only the test changed. The Sparks have none. To run one locally, on a machine
+with KVM:
+
+```console
+nix build .#nixosConfigurations.seladonia.config.system.build.installTest -L
+```
 
 ## Remote access
 
