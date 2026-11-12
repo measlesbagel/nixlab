@@ -59,6 +59,7 @@
           ./modules/ups.nix
           ./modules/cache.nix
           ./modules/comin.nix
+          ./modules/nfs-server.nix
         ];
 
         # `system` also picks the CI runner that builds the host.
