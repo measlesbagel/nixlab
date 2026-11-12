@@ -29,6 +29,10 @@ let
       else
         acc
     ) { } cfg;
+  active = lib.filterAttrs (class: _: volumesOf class != { }) classes;
+
+  snapshotDirOf =
+    path: "${dirOf path}/${if lib.elem path replicate then replication.snapshotDir else "@snapshots"}";
 in
 {
   options.homelab.snapshots = mkOption {
@@ -52,14 +56,33 @@ in
     '';
   };
 
-  config.services.btrbk.instances = lib.mapAttrs (class: c: {
-    inherit (c) onCalendar;
-    settings = {
-      timestamp_format = "long";
-      snapshot_dir = "@snapshots";
-      snapshot_preserve_min = "latest";
-      snapshot_preserve = c.preserve;
-      volume = volumesOf class;
-    };
-  }) (lib.filterAttrs (class: _: volumesOf class != { }) classes);
+  config = {
+    services.btrbk.instances = lib.mapAttrs (class: c: {
+      inherit (c) onCalendar;
+      settings = {
+        timestamp_format = "long";
+        snapshot_dir = "@snapshots";
+        snapshot_preserve_min = "latest";
+        snapshot_preserve = c.preserve;
+        volume = volumesOf class;
+      };
+    }) active;
+
+    # A snapshot is <subvolume>.<timestamp>. The directories must match
+    # exactly: what albipes may read is decided by directory
+    # (modules/replication.nix).
+    homelab.vmTest.checks.snapshots = lib.mkIf (cfg != { }) ''
+      with subtest("btrbk snapshots each listed subvolume into its directory"):
+          machine.succeed("systemctl start ${
+            toString (map (class: "btrbk-${class}.service") (lib.attrNames active))
+          }")
+          snapshot_dirs: dict[str, list[str]] = ${
+            builtins.toJSON (lib.mapAttrs (_: map baseNameOf) (lib.groupBy snapshotDirOf (lib.attrNames cfg)))
+          }
+          for directory, subvolumes in snapshot_dirs.items():
+              found = machine.succeed(f"ls {quote(directory)}").split()
+              snapshotted = {name.rsplit(".", 1)[0] for name in found if "." in name}
+              assert snapshotted == set(subvolumes), f"{directory} holds {found}"
+    '';
+  };
 }

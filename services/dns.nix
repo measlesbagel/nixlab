@@ -11,6 +11,8 @@ let
     ;
 in
 {
+  imports = [ ./dns.test.nix ];
+
   services.unbound = {
     enable = true;
     # Peers only; the host keeps the router's resolver.

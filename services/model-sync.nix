@@ -139,6 +139,10 @@ in
       };
 
       homelab.reboot.blockers = [ "model-sync.service" ];
+
+      homelab.vmTest.unverifiable = lib.mkIf (cfg.local != [ ]) {
+        "model-sync.service" = "needs the model library on the LAN";
+      };
     }
 
     (lib.mkIf (cfg.serveTo != null) {
