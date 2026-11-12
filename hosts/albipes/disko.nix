@@ -10,6 +10,9 @@ let
   tankMountOptions = mountOptions ++ [
     "nofail"
     "x-systemd.device-timeout=30s"
+    # nofail also takes the mount out of local-fs.target's ordering, the only
+    # thing tmpfiles waits for, and its rules under /tank need tank mounted.
+    "x-systemd.before=systemd-tmpfiles-setup.service"
   ];
 in
 {
