@@ -78,6 +78,8 @@ lib.mkMerge [
         head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' > ${primaryPassword}
       '';
     };
+
+    homelab.vmTest.unverifiable."upsdrv.service" = "needs the UPS on USB";
   })
 
   (lib.mkIf (!isServer) {
