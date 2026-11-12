@@ -5,5 +5,12 @@
 {
   config = lib.mkIf config.services.nfs.server.enable {
     systemd.services.nfs-mountd.preStart = "touch /var/lib/nfs/etab";
+
+    # rpc.mountd's parent exits 0 as its child dies, so nfs-mountd can end
+    # inactive with Result=success while nfs-server stays up.
+    homelab.vmTest.checks.nfs = ''
+      with subtest("rpc.mountd runs behind the NFS server"):
+          machine.succeed("systemctl is-active nfs-mountd.service", "pgrep -x rpc.mountd")
+    '';
   };
 }

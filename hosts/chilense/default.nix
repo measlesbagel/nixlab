@@ -1,5 +1,10 @@
 # TODO(provisioning): GPU stack lands at migration.
-{ inputs, ... }:
+{
+  config,
+  inputs,
+  lib,
+  ...
+}:
 {
   imports = [
     inputs.disko.nixosModules.disko
@@ -20,4 +25,12 @@
     extraModules = [ inputs.hjem-rum.hjemModules.default ];
     users.measles = import ../../home/measles;
   };
+
+  homelab.vmTest.checks.hjem = ''
+    with subtest("measles's login shell finds every hjem package"):
+        for tool in ${
+          builtins.toJSON (map (package: baseNameOf (lib.getExe package)) config.hjem.users.measles.packages)
+        }:
+            machine.succeed(f"runuser -l measles -c 'command -v {tool}'")
+  '';
 }
