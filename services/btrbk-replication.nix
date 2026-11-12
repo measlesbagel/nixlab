@@ -75,4 +75,20 @@ in
     # onto the OS disk.
     unitConfig.RequiresMountsFor = [ backups ];
   };
+
+  homelab.vmTest.unverifiable."btrbk-replication.service" = "needs its sources on the LAN";
+
+  homelab.vmTest.checks.btrbk-replication = ''
+    with subtest("btrbk has a pull key, and its targets are on tank"):
+        machine.succeed(
+            "systemctl start ssh-keygen-btrbk.service",
+            "${lib.getExe' pkgs.openssh "ssh-keygen"} -l -f ${sshKey}.pub",
+            '[ "$(stat -c %U:%a ${sshKey})" = btrbk:600 ]',
+            *${
+              builtins.toJSON (
+                map (host: ''[ "$(findmnt -rno TARGET --target ${backups}/${host})" = ${backups} ]'') sources
+              )
+            },
+        )
+  '';
 }

@@ -70,5 +70,33 @@ in
     );
 
     homelab.ssh.logins.btrbk = [ "hapalotremus" ];
+
+    # Runs the key's forced command as sshd would, with what btrbk on albipes
+    # sends in SSH_ORIGINAL_COMMAND. stdout would be the send stream.
+    homelab.vmTest.checks.replication =
+      let
+        subvolume = lib.head subvolumes;
+        top = dirOf subvolume;
+      in
+      ''
+        with subtest("the pull key sends replicated snapshots and nothing else"):
+            machine.succeed("systemctl start btrbk-state.service")
+            snapshot = machine.succeed("ls -d ${top}/${snapshotDir}/${baseNameOf subvolume}.*").split()[0]
+            pull_filter = ${builtins.toJSON filter}
+
+            def pull(command: str) -> tuple[int, str]:
+                return machine.execute(f"runuser -u btrbk -- env {quote('SSH_ORIGINAL_COMMAND=' + command)} sh -c {quote(pull_filter)} 2>&1 > /dev/null")
+
+            for command in ["sudo -n readlink -e '${subvolume}'", f"sudo -n btrfs send '{snapshot}'"]:
+                status, output = pull(command)
+                assert status == 0, f"{command}: {output}"
+            for command in [
+                "sudo -n btrfs send '${top}/@snapshots/@other.20260101T0000'",
+                f"sudo -n btrfs subvolume delete '{snapshot}'",
+                "sudo -n btrfs subvolume snapshot -r '${subvolume}' '${top}/${snapshotDir}/@new'",
+            ]:
+                status, output = pull(command)
+                assert status == 255 and "ssh command rejected" in output, f"{command}: {status} {output}"
+      '';
   };
 }

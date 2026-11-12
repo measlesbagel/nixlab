@@ -105,4 +105,13 @@ in
       };
     };
   };
+
+  homelab.vmTest.checks.tank = ''
+    with subtest("tank is RAID1 across both data drives"):
+        machine.succeed(
+            "btrfs filesystem show /mnt/tank | grep 'Total devices 2 '",
+            "btrfs filesystem df /mnt/tank | grep '^Data, RAID1:'",
+            "btrfs filesystem df /mnt/tank | grep '^Metadata, RAID1:'",
+        )
+  '';
 }
