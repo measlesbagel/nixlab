@@ -109,20 +109,20 @@ Monday at 09:17 UTC and opens one PR, `chore(flake): update flake.lock`,
 from the branch `update_flake_lock_action`. A later run updates that same PR.
 Dependabot only bumps GitHub Actions (`.github/dependabot.yml`).
 
-The PR is opened with a personal access token, because GitHub starts no
-workflows for a PR that `GITHUB_TOKEN` opens, so CI would never run on it.
-It therefore shows as opened by measlesbagel, runs the full CI like any PR,
-and its commit is authored by `github-actions[bot]`. After review, merge it in
-the web UI. That deploys like any other merge, because comin only deploys tips
-that GitHub signed.
+The PR is opened with a short-lived GitHub App installation token minted by
+`actions/create-github-app-token`, because GitHub starts no workflows for a PR
+that `GITHUB_TOKEN` opens, so CI would never run on it. It shows as opened by
+the app's bot account, runs the full CI like any PR, and its commit is authored
+by `github-actions[bot]`. After review, merge it in the web UI. That deploys
+like any other merge, because comin only deploys tips that GitHub signed.
 
-Before the first run, create a fine-grained token with resource owner
-measlesbagel, only the `nixlab` repository, Contents and Pull requests read
-and write, and no expiration, and add it as the Actions secret
-`FLAKE_UPDATE_TOKEN`.
+Before the first run, create a private GitHub App owned by measlesbagel with
+Contents and Pull requests read and write permissions, install it on `nixlab`,
+and add its Client ID and private key as the Actions secrets
+`FLAKE_UPDATE_APP_CLIENT_ID` and `FLAKE_UPDATE_APP_PRIVATE_KEY`.
 
 Schedules and manual runs use the workflow on `main`, so nothing runs before
-it merges. After the merge and the token, trigger the first run with:
+it merges. After the merge and the secrets, trigger the first run with:
 
 ```console
 gh workflow run update-flake-lock.yml
