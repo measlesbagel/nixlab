@@ -20,7 +20,7 @@
 
   homelab.vfio = {
     enable = true;
-    vmNames = [ "win11-scan" ];
+    vmNames = [ "win11" ];
     igpuPciAddress = "0000:0c:00.0";
     # IOMMU group 12: RTX 4090 VGA + HDA audio.
     gpuDevices = [
