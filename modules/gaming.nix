@@ -1,7 +1,9 @@
 # Steam, GameMode, gamescope and MangoHud. Steam's own client (OpenGL/CEF)
 # stays on the GPU that drives the display; its Vulkan games, DXVK (D3D9-11)
-# and VKD3D-Proton (D3D12) prefer `homelab.gaming.gpu` and fall back to the
-# others while it is away, e.g. passed through to a VM.
+# and VKD3D-Proton (D3D12) run on `homelab.gaming.gpu`, or fail to start while
+# it is away, e.g. passed through to a VM. OpenGL games still need
+# `nvidia-offload %command%`: offloading GL for all of Steam would move its
+# client onto that GPU too.
 {
   config,
   lib,
@@ -12,15 +14,17 @@ let
   inherit (lib) mkOption types;
   inherit (config.homelab.gaming) gpu;
 
+  # The driver select covers every Vulkan game. The device select (which hides
+  # the other GPUs only while this one is present) and DXVK's filter (all of
+  # D3D under Proton) still hold where the Vulkan loader predates 1.3.234.
   env = {
-    # Without a trailing `!` the other devices stay listed, after this one.
-    MESA_VK_DEVICE_SELECT = gpu.pciId;
-    # A miss falls back to the first device. DXVK_FILTER_DEVICE_NAME is left
-    # out: a miss there leaves D3D games no adapter at all, and DXVK already
-    # ranks discrete GPUs first.
+    MESA_VK_DEVICE_SELECT = "${gpu.pciId}!";
+    DXVK_FILTER_DEVICE_NAME = gpu.name;
     VKD3D_FILTER_DEVICE_NAME = gpu.name;
   }
   // lib.optionalAttrs (lib.hasPrefix "10de:" gpu.pciId) {
+    # Globbed: Steam's container renames manifests, keeping the basename.
+    VK_LOADER_DRIVERS_SELECT = "*nvidia*";
     # DLSS and Reflex; Proton hides NVAPI by default.
     PROTON_ENABLE_NVAPI = "1";
   };
