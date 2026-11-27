@@ -43,6 +43,12 @@ in
                 mountpoint = "/home";
                 inherit mountOptions;
               };
+              # Excluded from snapshots/replication; tmpfiles sets +C (NoCoW)
+              # on the directory since btrfs mount options are superblock-wide.
+              "@vms" = {
+                mountpoint = "/var/lib/libvirt/images";
+                mountOptions = [ "noatime" ];
+              };
               "@snapshots" = { };
             };
           };

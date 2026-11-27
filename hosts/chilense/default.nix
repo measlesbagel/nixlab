@@ -1,4 +1,4 @@
-# TODO(provisioning): GPU stack lands at migration.
+# TODO(provisioning): Wayland compositor lands at migration.
 {
   config,
   inputs,
@@ -17,6 +17,25 @@
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  homelab.vfio = {
+    enable = true;
+    vmNames = [ "win11" ];
+    igpuPciAddress = "0000:0c:00.0";
+    # IOMMU group 12: RTX 4090 VGA + HDA audio.
+    gpuDevices = [
+      "0000:01:00.0"
+      "0000:01:00.1"
+    ];
+    # Shrink 32 GiB ReBAR (BAR1 = 2^15 MiB) to 256 MiB (2^8 MiB) for OVMF,
+    # then restore 32 GiB when the GPU returns to Linux.
+    resizeBar = {
+      device = "0000:01:00.0";
+      resource = 1;
+      guestSize = 8;
+      hostSize = 15;
+    };
+  };
 
   homelab.snapshots."/mnt/btr_pool/@home" = "state";
   homelab.replicate = [ "/mnt/btr_pool/@home" ];
