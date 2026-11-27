@@ -1,0 +1,78 @@
+# yaml-language-server: $schema=https://aka.ms/configuration-dsc-schema/0.2
+# Declarative Windows 11 packages and settings for chilense's `win11` VM.
+# Mounted read-only inside Windows via virtiofs (`win-config` -> Y:\) and
+# applied idempotently from Linux with `win11-apply`.
+properties:
+  configurationVersion: 0.2.0
+  assertions:
+    - resource: Microsoft.Windows.Developer/OsVersion
+      directives:
+        description: Verify Windows 11 or newer
+        allowPrerelease: true
+      settings:
+        MinVersion: "10.0.22000"
+  resources:
+    - resource: Microsoft.Windows.Developer/WindowsExplorer
+      directives:
+        description: Show file extensions and hidden files
+        allowPrerelease: true
+      settings:
+        FileExtensions: Show
+        HiddenFiles: Show
+
+    - resource: Microsoft.Windows.Developer/EnableDarkMode
+      directives:
+        description: Enable Windows dark mode
+        allowPrerelease: true
+      settings:
+        Ensure: Present
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: winfsp
+      directives:
+        description: Install WinFsp (required for virtiofs shared folders)
+      settings:
+        id: WinFsp.WinFsp
+        source: winget
+        ensure: Present
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: nvidia-app
+      directives:
+        description: Install NVIDIA App for GeForce RTX 4090 driver management
+      settings:
+        id: Nvidia.NvidiaApp
+        source: winget
+        ensure: Present
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: pwsh
+      directives:
+        description: Install PowerShell 7
+      settings:
+        id: Microsoft.PowerShell
+        source: winget
+        ensure: Present
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: git
+      directives:
+        description: Install Git
+      settings:
+        id: Git.Git
+        source: winget
+        ensure: Present
+
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: 7zip
+      directives:
+        description: Install 7-Zip
+      settings:
+        id: 7zip.7zip
+        source: winget
+        ensure: Present
+
+    # Add Bambu Scan and other Windows-only tools here once their WinGet IDs are
+    # published (or install via a custom PowerShell step in bootstrap.ps1).
+    # Looking Glass bleeding-edge signed IDD host must match the pinned master
+    # commit in modules/vfio.nix and is downloaded from looking-glass.io.
