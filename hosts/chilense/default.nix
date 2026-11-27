@@ -27,13 +27,6 @@
       "0000:01:00.0"
       "0000:01:00.1"
     ];
-    # Optional isolated peripheral passthrough for 3D scanning:
-    # - 0000:09:00.0 (group 19): onboard MediaTek MT7922 Wi-Fi 6E (BT stays on 0a:00.0)
-    # - 0000:0c:00.4 (group 26): empty CPU USB 3.1 10 Gbps controller
-    vm.extraPciDevices = [
-      "0000:09:00.0"
-      "0000:0c:00.4"
-    ];
     # Shrink 32 GiB ReBAR (BAR1 = 2^15 MiB) to 256 MiB (2^8 MiB) for OVMF,
     # then restore 32 GiB when the GPU returns to Linux.
     resizeBar = {
