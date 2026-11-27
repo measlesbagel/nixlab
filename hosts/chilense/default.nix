@@ -11,6 +11,7 @@
     ./disko.nix
     ./hardware.nix
     ./networking.nix
+    ./peripherals.nix
   ];
 
   networking.hostName = "chilense";

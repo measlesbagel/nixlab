@@ -104,6 +104,7 @@
               inputs.hjem.nixosModules.default
               inputs.nix-rtl8159.nixosModules.default
               ./services/model-sync.nix
+              ./modules/desktop.nix
             ];
           };
           leetzi = {
