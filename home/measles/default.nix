@@ -10,7 +10,6 @@
 
   packages = with pkgs; [
     # Shell
-    eza
     bat
     fastfetch
     btop
@@ -81,11 +80,6 @@
   rum.programs.nushell = {
     enable = true;
     settings.show_banner = false;
-    aliases = {
-      la = "eza -a --group-directories-first --icons=always";
-      ll = "eza -l --group-directories-first --icons=always";
-      lt = "eza -aT --group-directories-first --icons=always";
-    };
     extraConfig = ''
       $env.PATH = ($env.PATH | prepend [
         ($env.HOME | path join .local/bin)
@@ -95,12 +89,6 @@
 
       fastfetch
     '';
-  };
-
-  # Leaves ~/.config/starship.toml, which Noctalia's templates write, alone.
-  rum.programs.starship = {
-    enable = true;
-    integrations.nushell.enable = true;
   };
 
   # The CachyOS entry starts /opt/1Password/1password.
