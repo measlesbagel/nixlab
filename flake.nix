@@ -101,6 +101,7 @@
             dir = ./hosts/chilense;
             modules = [
               ./modules/btrfs.nix
+              ./modules/gaming.nix
               inputs.hjem.nixosModules.default
               inputs.nix-rtl8159.nixosModules.default
               ./services/model-sync.nix
