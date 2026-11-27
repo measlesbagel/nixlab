@@ -27,4 +27,9 @@
   # The in-tree r8152 only reaches 10G on the RTL8159 with this PHY firmware,
   # from kernel 7.2 on (the module asserts it).
   hardware.rtl8159.enable = true;
+
+  homelab.gaming.gpu = {
+    pciId = "10de:2684";
+    name = "NVIDIA GeForce RTX 4090";
+  };
 }
