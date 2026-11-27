@@ -1,6 +1,6 @@
-# The workstation's Wayland desktop: Umbriel, with niri as a second session,
-# and the Noctalia shell, behind greetd's Noctalia greeter. Their configs stay
-# in the user's home, where Noctalia and the user's tools rewrite them.
+# The workstation's Wayland desktop: Umbriel and the Noctalia shell, behind
+# greetd's Noctalia greeter. Their configs stay in the user's home, where
+# Noctalia and the user's tools rewrite them.
 {
   config,
   lib,
@@ -13,21 +13,11 @@ let
 in
 {
   programs.umbriel.enable = true;
-  programs.niri.enable = true;
   # No unit of its own: Umbriel's autostart runs it, and a second instance
   # would contend for org.freedesktop.Notifications.
   programs.noctalia.enable = true;
 
-  services.displayManager = {
-    defaultSession = "umbriel";
-    noctalia-greeter = {
-      enable = true;
-      cursorTheme = {
-        package = pkgs.rose-pine-cursor;
-        name = "BreezeX-RosePine-Linux";
-      };
-    };
-  };
+  services.displayManager.noctalia-greeter.enable = true;
 
   # greetd's PAM stack is login's, which this unlocks the keyring in.
   services.gnome.gnome-keyring.enable = true;
@@ -52,9 +42,6 @@ in
 
   services.flatpak.enable = true;
 
-  programs.fish.enable = true;
-  users.users.${user}.shell = pkgs.fish;
-
   # `op` unlocks through the GUI, which needs a polkit owner; provisioning
   # (docs/provisioning.md) runs `op` here.
   programs._1password.enable = true;
@@ -71,13 +58,8 @@ in
   environment.systemPackages = with pkgs; [
     adw-gtk3
     adwaita-icon-theme
-    rose-pine-cursor
     kdePackages.qt6ct
     wl-clipboard
-    # niri runs X11 clients through it when it is on PATH.
-    xwayland-satellite
-    # Fish loads it from its vendor conf.d.
-    fishPlugins.done
   ];
 
   fonts = {

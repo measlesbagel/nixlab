@@ -1,11 +1,15 @@
-{ pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 {
   enable = true;
   directory = "/home/measles";
 
   packages = with pkgs; [
     # Shell
-    starship
     eza
     bat
     fastfetch
@@ -23,9 +27,6 @@
     wget
     rsync
     # Desktop
-    kitty
-    ghostty
-    alacritty
     zed-editor
     meld
     obsidian
@@ -42,8 +43,6 @@
     cliphist
     wtype
     podman-desktop
-    # Umbriel's autostart runs Python scripts through `env python3`.
-    python3
     # Development
     gh
     tea
@@ -72,28 +71,37 @@
     scrcpy
   ];
 
-  # cachyos-config.fish, which ~/.config/fish/config.fish sourced on CachyOS.
-  xdg.config.files."fish/conf.d/nixlab.fish".text = ''
-    fish_add_path ~/.local/bin ~/.cargo/bin
+  # Ghostty also reads ~/.config/ghostty/config.ghostty, which stays
+  # hand-written and wins where both set a key.
+  rum.programs.ghostty = {
+    enable = true;
+    settings.command = lib.getExe config.rum.programs.nushell.package;
+  };
 
-    function fish_greeting
-        fastfetch
-    end
+  rum.programs.nushell = {
+    enable = true;
+    settings.show_banner = false;
+    aliases = {
+      la = "eza -a --group-directories-first --icons=always";
+      ll = "eza -l --group-directories-first --icons=always";
+      lt = "eza -aT --group-directories-first --icons=always";
+    };
+    extraConfig = ''
+      $env.PATH = ($env.PATH | prepend [
+        ($env.HOME | path join .local/bin)
+        ($env.HOME | path join .cargo/bin)
+        ($env.HOME | path join go/bin)
+      ] | uniq)
 
-    set -x MANROFFOPT -c
-    set -x MANPAGER "sh -c 'col -bx | bat -l man -p'"
-    set -g __done_min_cmd_duration 10000
-    set -g __done_notification_urgency_level low
+      fastfetch
+    '';
+  };
 
-    function history
-        builtin history --show-time='%F %T ' $argv
-    end
-
-    alias ls='eza -al --color=always --group-directories-first --icons=always'
-    alias la='eza -a --color=always --group-directories-first --icons=always'
-    alias ll='eza -l --color=always --group-directories-first --icons=always'
-    alias lt='eza -aT --color=always --group-directories-first --icons=always'
-  '';
+  # Leaves ~/.config/starship.toml, which Noctalia's templates write, alone.
+  rum.programs.starship = {
+    enable = true;
+    integrations.nushell.enable = true;
+  };
 
   # The CachyOS entry starts /opt/1Password/1password.
   xdg.config.files."autostart/com.onepassword.OnePassword.desktop" = {

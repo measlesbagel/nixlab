@@ -33,5 +33,11 @@
           builtins.toJSON (map (package: baseNameOf (lib.getExe package)) config.hjem.users.measles.packages)
         }:
             machine.succeed(f"runuser -l measles -c 'command -v {tool}'")
+
+    with subtest("the nushell Ghostty opens loads measles's config"):
+        aliases = machine.succeed(
+            "runuser -l measles -c '${lib.getExe config.hjem.users.measles.rum.programs.nushell.package} --config ~/.config/nushell/config.nu -c \"scope aliases | get name | to json -r\"' | tail -n 1"
+        )
+        assert set(${builtins.toJSON (lib.attrNames config.hjem.users.measles.rum.programs.nushell.aliases)}) <= set(json.loads(aliases)), aliases
   '';
 }
